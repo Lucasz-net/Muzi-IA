@@ -1,0 +1,26 @@
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Capa de UI (chat, globo, paneles). Todo elemento que deba capturar clics
+   debe llevar la clase .interactive para el hit-test de click-through. */
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
