@@ -93,7 +93,9 @@ Coloca tu `.vrm` en `assets/models/` (se usa el primero por orden alfabético; s
 
 Qué hace la app con el modelo (`src/character/vrmCharacter.ts`):
 
-- **Animaciones de Mixamo:** si colocas `.fbx` en `assets/animations/` y los asignas a estados en `animations.json`, se retargetean al VRM y se mezclan con la pose procedural (ver `assets/animations/README.md`).
+- **Animaciones de Mixamo:** si colocas `.fbx` en `assets/animations/` y los asignas a estados en `animations.json`, se retargetean al VRM y se mezclan con la pose procedural (ver `assets/animations/README.md`). Todos los comandos de prueba están en `COMANDOS_ANIMACIONES.txt`.
+- **Gestos con código:** guiño, sonrisa, risa, sorpresa, sueño, puchero, suspiro, bostezo, estirarse, **corazón coreano**, paz, pulgar arriba, zarpitas de gato... Se lanzan solos en reposo, muy espaciados, y se prueban con `mizuStage.gesture("fingerHeart")` (ver `assets/animations/README.md`).
+- **Reposo vivo:** la pose procedural respira, cambia el peso de pierna con los pies plantados y mantiene brazos y dedos relajados; entre clips descansa un rato al azar.
 - **Poses por estado:** una `Pose` abstracta (cuerpo, cabeza, brazos, codos) se aplica a los huesos humanoides normalizados. Los valores están en `src/character/procedural.ts`.
 - **Expresiones:** `happy` al celebrar, `sad` en error, `surprised` al pedir permiso, `relaxed` en reposo.
 - **Parpadeo** automático (`blink`), **mirada** con vida propia (en reposo alterna al azar entre mirar alrededor girando la cabeza, mirar de frente y seguir el cursor un rato; con actividad mira de frente) y **lipsync** (`aa/ih/ou/ee/oh`) mientras habla la voz.
@@ -105,7 +107,7 @@ Depurar animaciones desde la consola de la ventana (solo desarrollo): escribe `m
 
 ## Ventana y click-through
 
-La ventana (1040 px) es simétrica: franja de diálogo | personaje | franja de diálogo. El personaje queda siempre en el centro y el diálogo ocupa una de las franjas (`ui/layout.ts` elige el lado). `--zone` en `src/style.css` y `SIDE_ZONE` en `src-tauri/src/window.rs` deben coincidir. Por defecto la franja derecha, vacía, queda fuera de la pantalla.
+La ventana (1180 px) es simétrica: franja de diálogo | personaje | franja de diálogo. El personaje queda siempre en el centro y el diálogo ocupa una de las franjas (`ui/layout.ts` elige el lado). `--zone` en `src/style.css` y `SIDE_ZONE` en `src-tauri/src/window.rs` deben coincidir. Por defecto la franja derecha, vacía, queda fuera de la pantalla.
 
 La ventana es transparente, sin bordes y sin icono en la barra de tareas. Tauri solo permite ignorar el ratón para la ventana completa, así que el backend emite la posición del cursor (`cursor-moved`) y el frontend hace un hit-test (raycast al personaje + elementos con clase `.interactive`) para activar/desactivar el click-through con `set_click_through`.
 

@@ -1,0 +1,259 @@
+=====================================================================
+  MIZU-IA  -  COMANDOS PARA PROBAR ANIMACIONES, GESTOS Y VISTA
+=====================================================================
+
+Todo esto funciona SOLO en modo desarrollo (npm run tauri dev).
+
+
+---------------------------------------------------------------------
+1. COMO ABRIR LA CONSOLA
+---------------------------------------------------------------------
+  - Con la ventana de Mizu-IA en primer plano: F12
+  - o clic derecho sobre la ventana > Inspeccionar
+  - Pestana "Console" (Consola). Pega los comandos y pulsa Enter.
+
+  Para ver esta misma lista dentro de la app, con los clips que hay
+  cargados ahora mismo:
+
+      mizuHelp()
+
+
+---------------------------------------------------------------------
+2. ESTADOS DEL PERSONAJE
+---------------------------------------------------------------------
+  Fuerza un estado (cambia la animacion, la expresion y la mirada):
+
+      mizu.force("idle")
+      mizu.force("thinking")
+      mizu.force("working")
+      mizu.force("waiting_permission")
+      mizu.force("responding")
+      mizu.force("celebrating")
+      mizu.force("error")
+
+  idle                reposo (clips al azar + gestos automaticos)
+  thinking            pensando (clip Thinking)
+  working             usando herramientas (clip Texting While Standing)
+  waiting_permission  pide permiso (clip Standing Greeting + "!")
+  responding          escribiendo la respuesta (clip Talking)
+  celebrating         tarea terminada, ~3 s (clip Happy Idle)
+  error               fallo, ~3,5 s (pose procedural)
+
+
+---------------------------------------------------------------------
+3. CLIPS DE ANIMACION (los .fbx de Mixamo)
+---------------------------------------------------------------------
+  Lista los clips cargados:
+
+      mizuStage.listClips()
+
+  Reproduce uno a mano (el nombre exacto del archivo):
+
+      mizuStage.playClip("Kawaii Kaiwai.fbx")
+      mizuStage.playClip("bailetiktok.fbx")
+      mizuStage.playClip("Bling-Bang-Bang-Born.fbx")
+      mizuStage.playClip("bailetiktok2.fbx")
+      mizuStage.playClip("ハッピーシンセサイザ.fbx")
+      mizuStage.playClip("Idle.fbx")
+      mizuStage.playClip("Look Around.fbx")
+      mizuStage.playClip("Dwarf Idle.fbx")
+      mizuStage.playClip("Talking.fbx")
+      mizuStage.playClip("Texting While Standing.fbx")
+      mizuStage.playClip("Standing Greeting.fbx")
+      mizuStage.playClip("Happy Idle.fbx")
+      mizuStage.playClip("Thinking.fbx")
+
+  Detener el clip:
+
+      mizuStage.playClip(null)
+
+  OJO: playClip(null) tambien APAGA los clips automaticos por estado.
+  Para volver al comportamiento normal hay que llamar SIN argumento:
+
+      mizuStage.playClip()
+
+  Saltar a un instante del clip que esta sonando (segundos):
+
+      mizuStage.debug.character().clips.seek(18)
+
+
+---------------------------------------------------------------------
+4. GESTOS HECHOS CON CODIGO (sin clip)
+---------------------------------------------------------------------
+  Lanzar uno:
+
+      mizuStage.gesture("fingerHeart")
+
+  Ver la lista actual:
+
+      mizuStage.listGestures()
+
+  CARA
+      wink  winkLeft  winkRight     guino (al azar / ojo izquierdo / derecho)
+      smile                         sonrisa suave
+      laugh                         risa completa
+      surprised                     sorpresa
+      sleepy                        cara de sueno
+      shy                           timidez
+      pout                          puchero
+      lookUp                        mirada pensativa hacia arriba
+      sigh                          suspiro
+      yawn                          bostezo
+      tilt                          ladear la cabeza
+      nod                           asentir
+      shake                         negar con la cabeza
+
+  CUERPO Y MANOS
+      stretch                       estirarse con los brazos arriba
+      fingerHeart                   corazon coreano con los dedos + corazon rojo
+      peace                         signo de la paz
+      thumbsUp                      pulgar arriba
+      catPaws                       zarpitas de gato (amasan a contratiempo)
+
+  Gestos automaticos en reposo (se lanzan solos, muy espaciados, y solo
+  cuando NO suena ningun clip). Apagar / encender:
+
+      mizuStage.debug.character().autoGestures = false
+      mizuStage.debug.character().autoGestures = true
+
+  Las probabilidades estan en IDLE_GESTURES (src/character/gestures.ts).
+
+
+---------------------------------------------------------------------
+5. VISTA Y CAMARA
+---------------------------------------------------------------------
+  Cuerpo completo / plano medio (de medio muslo hacia arriba). El
+  boton de la lupa del menu hace lo mismo y recuerda la eleccion:
+
+      mizuStage.setView("full")
+      mizuStage.setView("upper")
+
+  Camara de perfil (giro en radianes; 0 la restaura):
+
+      mizuStage.debug.orbit(Math.PI / 2)
+      mizuStage.debug.orbit(0)
+
+  Poner la camara a mano (por ejemplo cerca de una mano):
+
+      const c = mizuStage.debug.camera()
+      c.position.set(0.1, 1.3, 0.6)
+      c.lookAt(0.1, 1.3, 0)
+
+  Para restaurar el encuadre normal despues de mover la camara:
+
+      mizuStage.setView("full")
+
+  Fondo liso temporal (para ver mejor la silueta; se quita al recargar):
+
+      document.body.style.background = "#3a3f4a"
+
+
+---------------------------------------------------------------------
+6. VOZ, BOCA Y CABEZA AL HABLAR
+---------------------------------------------------------------------
+  Lipsync sin audio (true / false):
+
+      mizuStage.setSpeaking(true)
+      mizuStage.setSpeaking(false)
+
+  Un empujon de boca (como si empezara una palabra):
+
+      mizuStage.pulseMouth()
+
+  Voz real + lipsync:
+
+      mizuSay("Hola, soy Mizu")
+
+  Mientras habla, la cabeza acompana con pequenos cabeceos.
+
+
+---------------------------------------------------------------------
+7. MIRADA
+---------------------------------------------------------------------
+  En reposo alterna al azar entre mirar alrededor (50 %), de frente
+  (30 %) y seguir el cursor (20 %). Con actividad mira de frente.
+
+  Fijarla al frente para pruebas:
+
+      const g = mizuStage.debug.character().gaze
+      g.mode = "front"; g.modeUntil = 1e9
+
+
+---------------------------------------------------------------------
+8. DISENAR UNA POSE DE BRAZO / MANO EN VIVO
+---------------------------------------------------------------------
+  Fija el brazo derecho a una pose hasta que lo sueltes. Cada dedo es
+  [x, y, z] en radianes (z positivo = doblar hacia la palma):
+
+      mizuStage.debug.character().holdBody({ right: {
+        pitch: 0.85, roll: 0.4, elbow: 2.05, twist: -0.35,
+        fingers: {
+          IndexProximal: [0, 0, 0.4],
+          IndexIntermediate: [0, 0, 1.215],
+          ThumbMetacarpal: [0.749, -0.4, 0]
+        } } })
+
+      mizuStage.debug.character().holdBody(null)      <- soltar la pose
+
+  pitch  = brazo hacia delante     roll  = abrir el brazo (0 = colgando)
+  elbow  = flexion del codo        twist = giro del antebrazo
+
+  El corazon coreano se resolvio asi (ver README de animaciones).
+
+
+---------------------------------------------------------------------
+9. PROBAR EL GLOBO DE DIALOGO
+---------------------------------------------------------------------
+      mizuUi.bubble.handle({ type: "message", text: "**Hola** con `codigo`", is_delta: false })
+
+
+---------------------------------------------------------------------
+10. CONFIGURAR QUE CLIP SALE Y CADA CUANTO  (assets/animations/animations.json)
+---------------------------------------------------------------------
+  Cada estado apunta a un clip, o a una LISTA de variantes (reposo):
+
+      "waiting_permission": { "file": "Standing Greeting.fbx", "loop": true }
+
+      "idle": [
+        { "file": "Idle.fbx", "weight": 3, "cooldown": 68, "gap": [8, 20] },
+        { "file": "bailetiktok.fbx", "weight": 1, "cooldown": 4500, "gap": [60, 120] }
+      ]
+
+  file      nombre del .fbx (en assets/animations/)
+  loop      true = se repite mientras dure el estado
+  weight    probabilidad relativa frente a las demas variantes (1 por defecto)
+  cooldown  segundos MINIMOS antes de que ese clip pueda volver a salir
+            (el real suele ser 1,2-1,5 veces ese valor)
+  gap       [min, max] segundos de descanso con la pose procedural tras
+            acabar ese clip, antes del siguiente
+
+  El selector evita repetir el mismo clip, evita patrones A-B-A y
+  refuerza a los que llevan mucho sin salir (ninguno se queda sin
+  aparecer). Reinicia npm run tauri dev tras cambiar el archivo o
+  anadir .fbx.
+
+
+---------------------------------------------------------------------
+11. SIMULAR LA ROTACION SIN ESPERAR HORAS
+---------------------------------------------------------------------
+  Desde la carpeta del proyecto (usa tu animations.json y la duracion
+  real de cada .fbx; hace falta Node 22.6 o superior):
+
+      npm run simulate-idle
+      npm run simulate-idle -- 6 100        (6 horas x 100 repeticiones)
+
+  Muestra cada cuanto sale cada clip, si hay repeticiones seguidas o
+  patrones A-B-A, y la probabilidad de ver cada uno en una sesion de
+  media hora, una y dos horas. Util para ajustar cooldown / weight / gap.
+
+
+---------------------------------------------------------------------
+12. SI ALGO SE QUEDA PILLADO
+---------------------------------------------------------------------
+  - "Port 1420 is already in use": queda una instancia anterior. Cierra
+    mizu-ia.exe y el proceso node de Vite (Administrador de tareas).
+  - Los clips no hacen nada tras playClip(null): llama a playClip().
+  - La vista se queda en plano medio: es la eleccion guardada del boton
+    de la lupa; usa mizuStage.setView("full") o pulsa el boton.
+  - Un gesto de mano se ve raro con otro modelo VRM: los angulos de los
+    dedos estan ajustados a Mizu.vrm; reajustalos con holdBody (punto 8).
