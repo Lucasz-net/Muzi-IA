@@ -14,6 +14,10 @@ export class Lipsync {
   private bump = 0; // empujón por palabra
   private vowel: Viseme = "aa";
   private t = 0;
+  /** Cuánto está hablando ahora (0..1), para acompañar el habla con la cabeza. */
+  get energy() {
+    return this.level;
+  }
   readonly weights: Record<Viseme, number> = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
 
   setSpeaking(value: boolean) {

@@ -24,6 +24,9 @@ export interface Pose {
   // Codos: flexión del antebrazo (0 = brazo estirado, + = antebrazo hacia delante/arriba).
   armLElbow: number;
   armRElbow: number;
+  weight: number; // reparto del peso entre las piernas: + = sobre la pierna izquierda del personaje, - = sobre la derecha
+  curl: number; // 0..1 curvatura relajada de los dedos
+  shoulders: number; // elevación de los hombros (respiración)
   tint: number; // 0..1 tinte de error (rojizo)
 }
 
@@ -57,4 +60,8 @@ export interface Character {
   playClip?(file: string | null | undefined): void;
   /** Nombres de los clips cargados. */
   listClips?(): string[];
+  /** Lanza un gesto hecho con código (guiño, sonrisa, asentir...). Devuelve false si no existe. */
+  gesture?(name: string): boolean;
+  /** Nombres de los gestos disponibles. */
+  listGestures?(): string[];
 }

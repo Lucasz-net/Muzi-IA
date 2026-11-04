@@ -8,7 +8,7 @@
   --ok: #6ee7a0;
   --danger: #ff7a7a;
 
-  /* Ventana simétrica (1040 px): [franja de diálogo][personaje][franja de diálogo].
+  /* Ventana simétrica (1180 px): [franja de diálogo][personaje][franja de diálogo].
      --zone debe coincidir con SIDE_ZONE en src-tauri/src/window.rs. */
   --zone: 320px;
   --pad: 12px;

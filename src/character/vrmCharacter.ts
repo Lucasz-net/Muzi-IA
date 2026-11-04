@@ -6,6 +6,8 @@ import { Blink } from "./blink";
 import { ClipLayer, type ClipEntry } from "./clipLayer";
 import { loadMixamoClip } from "./mixamo";
 import { Gaze } from "./gaze";
+import { emptyFrame, Gestures, IDLE_GESTURES, type ArmGesture, type GestureFrame } from "./gestures";
+import { createHeart } from "./heart";
 import { createIndicators } from "./indicators";
 import { Lipsync } from "./lipsync";
 import type { Character, Pose } from "./types";
@@ -22,7 +24,14 @@ const STATE_EXPRESSIONS: Record<CompanionState, Partial<Record<string, number>>>
 };
 const MANAGED_EXPRESSIONS = ["relaxed", "happy", "sad", "surprised", "angry"];
 
-/** Huesos que escribe la pose procedural en cada fotograma. */
+const SIDES = ["left", "right"] as const;
+const FINGERS = ["Index", "Middle", "Ring", "Little"] as const;
+const SEGMENTS = ["Proximal", "Intermediate", "Distal"] as const;
+/** Curvatura (rad) de cada falange con `curl` = 1. */
+const CURL_ANGLES = [0.45, 0.65, 0.4];
+const fingerBone = (side: string, finger: string, segment: string) => `${side}${finger}${segment}` as VRMHumanBoneName;
+
+/** Huesos que escribe la pose procedural en cada fotograma (bajo un clip se mezclan desde aquí). */
 const OWNED_BONES: VRMHumanBoneName[] = [
   "hips",
   "spine",
@@ -30,11 +39,27 @@ const OWNED_BONES: VRMHumanBoneName[] = [
   "upperChest",
   "neck",
   "head",
+  "leftShoulder",
+  "rightShoulder",
   "leftUpperArm",
   "rightUpperArm",
   "leftLowerArm",
   "rightLowerArm",
+  "leftUpperLeg",
+  "rightUpperLeg",
+  "leftLowerLeg",
+  "rightLowerLeg",
+  "leftFoot",
+  "rightFoot",
+  ...SIDES.flatMap((s) => FINGERS.flatMap((f) => SEGMENTS.map((g) => fingerBone(s, f, g)))),
 ];
+
+/** Desplazamiento lateral (m) de la cadera hacia la pierna que carga el peso, con `weight` = 1. */
+const HIP_SHIFT_M = 0.02;
+/** Inclinación de la pelvis (rad) con `weight` = 1: la cadera de la pierna que carga sube. */
+const HIP_TILT = 0.05;
+/** Largo aproximado (m) de la pierna: sirve para calcular cuánto inclinarla y que el pie no se despegue del suelo. */
+const LEG_LENGTH_M = 0.9;
 
 /** Fracción de la altura del modelo a la que corta el plano medio (medio muslo). */
 const UPPER_CUT = 0.38;
@@ -101,11 +126,27 @@ class VrmCharacter implements Character {
   private readonly blink = new Blink();
   private readonly gaze = new Gaze();
   private readonly lipsync = new Lipsync();
+  private readonly gestures = new Gestures();
+  private gestureFrame: GestureFrame = emptyFrame();
+  /** Gestos que se lanzan solos en reposo (se puede apagar desde la consola). */
+  autoGestures = true;
+  private idleClock = 0;
+  private nextIdleGesture = 6 + Math.random() * 10;
+  /** Brazos fijados a mano para ajustar poses en vivo (solo desarrollo). */
+  private held: { left?: ArmGesture; right?: ArmGesture } | null = null;
+  private readonly qBody = new THREE.Quaternion();
   private readonly indicators = createIndicators(0.36);
+  private readonly heart = createHeart();
+  private readonly heartTips: [THREE.Vector3, THREE.Vector3] = [new THREE.Vector3(), new THREE.Vector3()];
+  /** Gestos de cara programados para el clip que suena (ver `clipFace`). */
+  private faceFile: string | null = null;
+  private faceLast = 0;
+  private faceRuns: { name: string; next: number; at: number[]; every?: [number, number] }[] = [];
   private readonly expr = new Map<string, number>(MANAGED_EXPRESSIONS.map((n) => [n, 0]));
 
   private readonly clips: ClipLayer;
   private readonly hips: THREE.Object3D;
+  private readonly hipsRestX: number;
   private readonly hipsRestY: number;
   private readonly bone: (name: VRMHumanBoneName) => THREE.Object3D | null;
   /** +1 si el brazo apunta hacia +X en T-pose, -1 si hacia -X (depende del modelo). */
@@ -115,7 +156,7 @@ class VrmCharacter implements Character {
   private readonly qGaze = new THREE.Quaternion();
 
   constructor(private readonly vrm: VRM) {
-    this.root.add(vrm.scene, this.indicators.root);
+    this.root.add(vrm.scene, this.indicators.root, this.heart.root);
     this.bone = (name) => vrm.humanoid.getNormalizedBoneNode(name);
 
     // Huesos que la pose procedural escribe a diario (el resto parte del reposo bajo un clip).
@@ -128,6 +169,7 @@ class VrmCharacter implements Character {
     this.clips.afterMix = () => this.followGazeOverClip();
 
     this.hips = this.bone("hips")!;
+    this.hipsRestX = this.hips.position.x;
     this.hipsRestY = this.hips.position.y;
 
     // Dirección de cada brazo en T-pose, medida en el propio modelo.
@@ -183,6 +225,14 @@ class VrmCharacter implements Character {
     return this.clips.names();
   }
 
+  gesture(name: string) {
+    return this.gestures.trigger(name);
+  }
+
+  listGestures() {
+    return this.gestures.list();
+  }
+
   setGaze(nx: number, ny: number, time: number) {
     this.gaze.setCursor(nx, ny, time);
   }
@@ -196,28 +246,71 @@ class VrmCharacter implements Character {
   }
 
   applyPose(p: Pose, _time: number) {
-    const gazeYaw = p.headYaw + this.gaze.yaw * GAZE_HEAD_YAW;
-    const gazePitch = p.headPitch - this.gaze.pitch * GAZE_HEAD_PITCH;
+    const gh = this.gestureFrame.head;
+    const gp = this.gestureFrame.pose;
+    const gazeYaw = p.headYaw + this.gaze.yaw * GAZE_HEAD_YAW + gh.yaw;
+    const gazePitch = p.headPitch - this.gaze.pitch * GAZE_HEAD_PITCH + gh.pitch;
+    const headRoll = p.headRoll + gh.roll;
 
-    this.hips.position.y = this.hipsRestY + p.bodyY;
-    this.hips.rotation.set(0, p.yaw, 0);
+    // Reparto del peso: la cadera se desplaza y sube hacia la pierna que carga; la otra se relaja.
+    const w = p.weight;
+    this.hips.position.x = this.hipsRestX + w * HIP_SHIFT_M;
+    this.hips.position.y = this.hipsRestY + p.bodyY + gp.bodyY - Math.abs(w) * 0.006;
+    this.hips.rotation.set(0, p.yaw, w * HIP_TILT);
     this.vrm.scene.scale.set(1 + p.squash * 0.5, 1 - p.squash, 1 + p.squash * 0.5);
 
-    this.rot("spine", p.lean * 0.45 - p.breath, 0, p.sway * 0.5);
-    this.rot("chest", p.lean * 0.35 - p.breath * 1.4, 0, p.sway * 0.3);
-    this.rot("upperChest", p.lean * 0.2, 0, p.sway * 0.2);
-    this.rot("neck", gazePitch * NECK_SHARE, gazeYaw * NECK_SHARE, p.headRoll * NECK_SHARE);
-    this.rot("head", gazePitch * HEAD_SHARE, gazeYaw * HEAD_SHARE, p.headRoll * HEAD_SHARE);
+    // La columna compensa la inclinación de la pelvis para que los hombros sigan nivelados.
+    const lean = p.lean + gp.lean;
+    const breath = p.breath + gp.breath;
+    const sway = p.sway + gp.sway;
+    this.rot("spine", lean * 0.45 - breath, 0, sway * 0.5 - w * HIP_TILT * 0.7);
+    this.rot("chest", lean * 0.35 - breath * 1.4, 0, sway * 0.3 - w * HIP_TILT * 0.3);
+    this.rot("upperChest", lean * 0.2, 0, sway * 0.2);
+    this.rot("neck", gazePitch * NECK_SHARE, gazeYaw * NECK_SHARE, headRoll * NECK_SHARE);
+    this.rot("head", gazePitch * HEAD_SHARE, gazeYaw * HEAD_SHARE, headRoll * HEAD_SHARE);
+
+    this.leg("left", Math.max(0, -w), w);
+    this.leg("right", Math.max(0, w), w);
+    for (const side of SIDES) this.rot(`${side}Shoulder`, 0, 0, this.armDir[side] * (p.shoulders + gp.shoulders));
 
     this.arm("left", p.armLPitch, p.armLRoll, p.armLElbow);
     this.arm("right", p.armRPitch, p.armRRoll, p.armRElbow);
+    this.fingers(p.curl);
+  }
+
+  /**
+   * Pierna: la que no carga el peso lleva la rodilla algo doblada y el pie adelantado. Además se
+   * contrarresta la inclinación y el desplazamiento de la pelvis (`w`) para que el pie quede
+   * plantado en el suelo en lugar de columpiarse con la cadera.
+   */
+  private leg(side: "left" | "right", free: number, w: number) {
+    this.rot(`${side}UpperLeg`, -0.1 * free, 0, -(w * HIP_TILT + (w * HIP_SHIFT_M) / LEG_LENGTH_M));
+    this.rot(`${side}LowerLeg`, 0.18 * free, 0, 0);
+    this.rot(`${side}Foot`, -0.08 * free, 0, 0);
+  }
+
+  /** Dedos sueltos: cada falange se dobla un poco hacia la palma. */
+  private fingers(curl: number) {
+    for (const side of SIDES) {
+      const dir = this.armDir[side];
+      for (const finger of FINGERS) {
+        SEGMENTS.forEach((segment, i) => this.rot(fingerBone(side, finger, segment), 0, 0, -dir * curl * CURL_ANGLES[i]));
+      }
+    }
   }
 
   update(dt: number, time: number) {
     const em = this.vrm.expressionManager;
 
     // Capa de clips (Mixamo) sobre la pose procedural que acaba de aplicarse.
+    this.gestureFrame = this.gestures.update(dt);
+    this.accompanySpeech(time);
+    this.scheduleIdleGesture(dt);
+    this.gaze.hold = this.gestureFrame.look;
     this.clips.update(dt);
+    this.clipFace();
+    this.applyBody(this.held ?? this.gestureFrame.body);
+    this.updateHeart(time);
 
     this.bone("head")?.getWorldPosition(this.headPos);
     this.gaze.update(dt, time, this.headPos);
@@ -228,17 +321,144 @@ class VrmCharacter implements Character {
       // Expresión de fondo según el estado.
       const goal = STATE_EXPRESSIONS[this.state];
       const k = 1 - Math.exp(-dt * 6);
+      const ge = this.gestureFrame.exp; // un gesto puede subir una expresión, nunca bajarla
       for (const [name, cur] of this.expr) {
         const next = cur + ((goal[name] ?? 0) - cur) * k;
         this.expr.set(name, next);
-        em.setValue(name, next);
+        em.setValue(name, Math.max(next, ge[name] ?? 0));
       }
-      em.setValue("blink", this.blink.update(dt));
+      em.setValue("blink", Math.max(this.blink.update(dt), ge.blink ?? 0));
+      em.setValue("blinkLeft", ge.blinkLeft ?? 0); // guiños
+      em.setValue("blinkRight", ge.blinkRight ?? 0);
       const mouth = this.lipsync.update(dt);
-      for (const v of Object.keys(mouth) as (keyof typeof mouth)[]) em.setValue(v, mouth[v]);
+      for (const v of Object.keys(mouth) as (keyof typeof mouth)[]) em.setValue(v, Math.max(mouth[v], ge[v] ?? 0));
     }
 
     this.vrm.update(dt);
+  }
+
+  /**
+   * Cara durante un clip. Los clips solo mueven cuerpo y cabeza, así que aquí se le suma la cara:
+   * una expresión de fondo (`mood`, que entra y sale con el clip) y gestos de cara lanzados en
+   * instantes fijos o al azar (`cues`), según el `face` del clip en `animations.json`.
+   */
+  private clipFace() {
+    const file = this.clips.playingFile;
+    const time = this.clips.playTime;
+    const face = file ? this.clips.faceOf(file) : undefined;
+    // Clip nuevo (o el mismo que vuelve a empezar): se reprograma desde cero.
+    if (file !== this.faceFile || time < this.faceLast - 0.5) {
+      this.faceFile = file;
+      this.faceRuns = (face?.cues ?? []).map((c) => ({
+        name: c.name,
+        every: c.every,
+        at: [...(c.at ?? [])].sort((a, b) => a - b),
+        next: c.every ? time + c.every[0] + Math.random() * (c.every[1] - c.every[0]) : Infinity,
+      }));
+    }
+    const prev = this.faceLast;
+    this.faceLast = time;
+    if (!face) return;
+
+    const amount = this.clips.amount;
+    const exp = this.gestureFrame.exp;
+    for (const [name, v] of Object.entries(face.mood ?? {})) exp[name] = Math.max(exp[name] ?? 0, v * amount);
+
+    if (this.clips.isFading || amount < 0.3) return;
+    for (const run of this.faceRuns) {
+      let fire = false;
+      while (run.at.length > 0 && run.at[0] <= time) {
+        // Un instante que ya quedó atrás (por ejemplo tras saltar en el clip) no se lanza tarde.
+        if (run.at[0] > prev - 0.25) fire = true;
+        run.at.shift();
+      }
+      if (run.every && time >= run.next) {
+        fire = true;
+        run.next = time + run.every[0] + Math.random() * (run.every[1] - run.every[0]);
+      }
+      if (fire && !this.gestures.busy) this.gestures.trigger(run.name);
+    }
+  }
+
+  /** Corazón rojo sobre la mano del corazón coreano. */
+  private updateHeart(time: number) {
+    const { w, side } = this.gestureFrame.heart;
+    if (w < 0.01) {
+      this.heart.update(0, null, time);
+      return;
+    }
+    const a = this.bone(`${side}IndexDistal`);
+    const b = this.bone(`${side}ThumbDistal`);
+    if (!a || !b) return this.heart.update(0, null, time);
+    a.getWorldPosition(this.heartTips[0]);
+    b.getWorldPosition(this.heartTips[1]);
+    this.heart.update(w, this.heartTips, time);
+  }
+
+  /** Al hablar, la cabeza acompaña al habla con pequeños cabeceos. */
+  private accompanySpeech(time: number) {
+    const talk = this.lipsync.energy;
+    if (talk < 0.02) return;
+    const h = this.gestureFrame.head;
+    h.pitch += talk * 0.09 * Math.sin(time * 6.1);
+    h.yaw += talk * 0.06 * Math.sin(time * 2.3 + 1);
+    h.roll += talk * 0.04 * Math.sin(time * 3.1);
+  }
+
+  /**
+   * En reposo, y solo mientras no suene ningún clip, lanza de vez en cuando un gesto al azar
+   * (sonrisa, suspiro, bostezo, corazón coreano...). El reloj solo corre en esos ratos, así que
+   * los gestos quedan muy espaciados.
+   */
+  private scheduleIdleGesture(dt: number) {
+    if (!this.autoGestures || this.state !== "idle" || this.clips.amount > 0.05 || this.gestures.busy) return;
+    this.idleClock += dt;
+    if (this.idleClock < this.nextIdleGesture) return;
+    this.idleClock = 0;
+    this.nextIdleGesture = 14 + Math.random() * 24;
+    let r = Math.random() * IDLE_GESTURES.reduce((s, g) => s + g.weight, 0);
+    const pick = IDLE_GESTURES.find((g) => (r -= g.weight) < 0) ?? IDLE_GESTURES[0];
+    this.gestures.trigger(pick.name);
+  }
+
+  /**
+   * Brazos y manos de un gesto, mezclados sobre lo que ya tengan los huesos (pose procedural o
+   * clip) según el peso del gesto. Las poses están definidas para el brazo derecho; al izquierdo
+   * se reflejan (las rotaciones en Y y Z cambian de signo).
+   */
+  private applyBody(body: { left?: ArmGesture; right?: ArmGesture }) {
+    for (const side of SIDES) {
+      const g = body[side];
+      if (!g || g.w < 0.001) continue;
+      const dir = this.armDir[side];
+      const mirror = side === "left" ? -1 : 1;
+      const blend = (name: VRMHumanBoneName, order: THREE.EulerOrder = "XYZ") => {
+        this.e.order = order;
+        this.bone(name)?.quaternion.slerp(this.qBody.setFromEuler(this.e), g.w);
+        this.e.order = "XYZ";
+      };
+
+      this.e.set(-g.pitch, 0, -dir * (Math.PI / 2 - g.roll));
+      blend(`${side}UpperArm`);
+      // Antebrazo: primero el giro sobre su eje (twist) y luego el codo.
+      this.e.set(g.twist ?? 0, -dir * g.elbow, 0);
+      blend(`${side}LowerArm`, "YXZ");
+      if (g.wrist) {
+        this.e.set(g.wrist[0], g.wrist[1] * mirror, g.wrist[2] * mirror);
+        blend(`${side}Hand`);
+      }
+      for (const [key, [x, y, z]] of Object.entries(g.fingers ?? {})) {
+        this.e.set(x, y * mirror, z * mirror);
+        blend(`${side}${key}` as VRMHumanBoneName);
+      }
+    }
+  }
+
+  /** Solo desarrollo: fija los brazos a una pose (peso 1) para ajustarla en vivo; `null` la suelta. */
+  holdBody(spec: { left?: Omit<ArmGesture, "w">; right?: Omit<ArmGesture, "w"> } | null) {
+    this.held = spec
+      ? { left: spec.left && { ...spec.left, w: 1 }, right: spec.right && { ...spec.right, w: 1 } }
+      : null;
   }
 
   /**
@@ -248,10 +468,12 @@ class VrmCharacter implements Character {
   private followGazeOverClip() {
     const amount = this.clips.amount;
     if (amount < 0.01) return;
-    const yaw = this.gaze.yaw * GAZE_HEAD_YAW * amount;
-    const pitch = -this.gaze.pitch * GAZE_HEAD_PITCH * amount;
+    const gh = this.gestureFrame.head;
+    const yaw = (this.gaze.yaw * GAZE_HEAD_YAW + gh.yaw) * amount;
+    const pitch = (-this.gaze.pitch * GAZE_HEAD_PITCH + gh.pitch) * amount;
+    const roll = gh.roll * amount;
     for (const [name, share] of [["neck", NECK_SHARE], ["head", HEAD_SHARE]] as const) {
-      this.e.set(pitch * share, yaw * share, 0, "XYZ");
+      this.e.set(pitch * share, yaw * share, roll * share, "XYZ");
       this.bone(name)?.quaternion.multiply(this.qGaze.setFromEuler(this.e));
     }
   }

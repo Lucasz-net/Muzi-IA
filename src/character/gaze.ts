@@ -44,6 +44,8 @@ export class Gaze {
   private nextJitter = 0;
   private jitterX = 0;
   private jitterY = 0;
+  /** Mirada impuesta por un gesto (p. ej. mirar hacia arriba pensando) y cuánto manda sobre la normal. */
+  hold = { x: 0, y: 0, w: 0 };
 
   setCursor(nx: number, ny: number, now: number) {
     this.cursorX = nx;
@@ -60,10 +62,14 @@ export class Gaze {
     if (now >= this.modeUntil) this.pickMode(now);
     this.updateGoal(now);
 
-    this.x += (this.goalX + this.jitterX - this.x) * (1 - Math.exp(-dt * EYE_SPEED));
-    this.y += (this.goalY + this.jitterY - this.y) * (1 - Math.exp(-dt * EYE_SPEED));
-    this.yaw += (this.goalX - this.yaw) * (1 - Math.exp(-dt * HEAD_SPEED));
-    this.pitch += (this.goalY - this.pitch) * (1 - Math.exp(-dt * HEAD_SPEED));
+    // Un gesto puede imponer hacia dónde se mira, con su propio peso.
+    const w = this.hold.w;
+    const gx = this.goalX * (1 - w) + this.hold.x * w;
+    const gy = this.goalY * (1 - w) + this.hold.y * w;
+    this.x += (gx + this.jitterX - this.x) * (1 - Math.exp(-dt * EYE_SPEED));
+    this.y += (gy + this.jitterY - this.y) * (1 - Math.exp(-dt * EYE_SPEED));
+    this.yaw += (gx - this.yaw) * (1 - Math.exp(-dt * HEAD_SPEED));
+    this.pitch += (gy - this.pitch) * (1 - Math.exp(-dt * HEAD_SPEED));
 
     // Punto delante de la cabeza hacia el que miran los ojos.
     this.target.position.set(head.x + this.x * 2.0, head.y + this.y * 1.2, head.z + 2.5);

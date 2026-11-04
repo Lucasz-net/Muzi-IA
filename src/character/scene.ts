@@ -23,12 +23,15 @@ export interface CharacterScene {
   playClip: (file?: string | null) => void;
   /** Solo desarrollo: nombres de los clips cargados. */
   listClips: () => string[];
+  /** Solo desarrollo: lanza un gesto hecho con código ("wink", "smile", "nod"...). Devuelve false si no existe. */
+  gesture: (name: string) => boolean;
+  listGestures: () => string[];
   /** "full" = cuerpo completo; "upper" = plano medio (de medio muslo hacia arriba). */
   setView: (view: ViewMode) => void;
   /** Resuelve cuando se intentó cargar el modelo VRM (con éxito o no). */
   modelReady: Promise<"vrm" | "placeholder">;
   /** Solo desarrollo: personaje activo y giro de la cámara (rad) para revisar poses. */
-  debug: { character: () => Character; orbit: (yaw: number) => void };
+  debug: { character: () => Character; orbit: (yaw: number) => void; camera: () => THREE.PerspectiveCamera };
 }
 
 const FOV = 30;
@@ -164,6 +167,8 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     pulseMouth: () => character.pulseMouth?.(),
     playClip: (file) => character.playClip?.(file),
     listClips: () => character.listClips?.() ?? [],
+    gesture: (name) => character.gesture?.(name) ?? false,
+    listGestures: () => character.listGestures?.() ?? [],
     setView(next) {
       view = next;
       document.documentElement.dataset.view = next; // el CSS difumina el borde inferior en plano medio
@@ -172,6 +177,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     modelReady,
     debug: {
       character: () => character,
+      camera: () => camera,
       orbit: (yaw) => {
         debugYaw = yaw;
         placeCamera();

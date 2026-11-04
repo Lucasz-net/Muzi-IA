@@ -36,8 +36,9 @@ if (import.meta.env.DEV) {
   mizu.force("idle" | "thinking" | "working" | "waiting_permission" | "responding" | "celebrating" | "error")
   mizuStage.listClips()                    lista los clips de animación cargados
   mizuStage.playClip("Nombre.fbx")         reproduce un clip a mano
-  mizuStage.playClip(null)                 detiene el clip
+  mizuStage.playClip(null)                 detiene el clip (y apaga los clips por estado hasta playClip())
   mizuStage.playClip()                     vuelve al comportamiento por estado
+  mizuStage.gesture("wink")                gesto con código: ${stage.listGestures().join(", ")}
   mizuStage.setView("full" | "upper")      cuerpo completo / plano medio
   mizuStage.debug.orbit(Math.PI / 2)       cámara de perfil (orbit(0) la restaura)
   mizuStage.setSpeaking(true | false)      lipsync sin audio

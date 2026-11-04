@@ -12,31 +12,52 @@ export function restPose(): Pose {
     headPitch: 0,
     headYaw: 0,
     headRoll: 0,
-    armLPitch: 0,
-    armLRoll: 0.12,
-    armRPitch: 0,
-    armRRoll: 0.12,
-    armLElbow: 0.12, // codos ligeramente flexionados en reposo
-    armRElbow: 0.12,
+    // Brazos relajados: un poco adelantados y separados del cuerpo, con los codos algo doblados.
+    armLPitch: 0.07,
+    armLRoll: 0.17,
+    armRPitch: 0.07,
+    armRRoll: 0.17,
+    armLElbow: 0.24,
+    armRElbow: 0.24,
+    weight: 0,
+    curl: 0.5, // dedos sueltos, ligeramente doblados
+    shoulders: 0,
     tint: 0,
   };
 }
 
 const { sin, cos, abs, exp, max } = Math;
 
+/**
+ * Reparto lento del peso entre las piernas (-1..1): cambia de pie cada ~8 s, como una persona
+ * de pie. Dos senos de periodos distintos para que no sea un vaivén perfectamente regular.
+ */
+const weightShift = (t: number) => sin(t * 0.39) * 0.85 + sin(t * 0.13 + 1) * 0.15;
+
 /** Poses generadas por código (pose + movimiento sutil) mientras no haya clips de animación. */
 export const proceduralPoses: PoseSource = {
   poseFor(state: CompanionState, t: number, s: number): Pose {
-    // Base común: respiración y balanceo lentos.
+    // Base común: respiración y movimientos lentos (aleatorios en apariencia, no mecánicos).
     const p = restPose();
-    p.breath = sin(t * 1.6) * 0.015;
-    p.sway = sin(t * 0.7) * 0.02;
-    p.headYaw = sin(t * 0.5) * 0.08;
-    p.armLRoll += sin(t * 1.6) * 0.02;
-    p.armRRoll += sin(t * 1.6 + 0.4) * 0.02;
+    const breathing = sin(t * 1.45);
+    p.breath = breathing * 0.012;
+    p.shoulders = breathing * 0.014; // los hombros suben un poco al inspirar
+    p.sway = sin(t * 0.43) * 0.012;
+    p.headYaw = sin(t * 0.37) * 0.03;
+    p.headRoll = sin(t * 0.29 + 0.6) * 0.025;
+    p.headPitch = sin(t * 0.21) * 0.02;
+    p.armLRoll += breathing * 0.012 + sin(t * 0.53) * 0.015;
+    p.armRRoll += breathing * 0.012 + sin(t * 0.53 + 1.3) * 0.015;
+    p.armLPitch += sin(t * 0.47) * 0.03;
+    p.armRPitch += sin(t * 0.47 + 2) * 0.03;
+    p.weight = weightShift(t) * 0.3; // en actividad el peso casi no cambia
 
     switch (state) {
       case "idle":
+        // En reposo el peso sí pasa de una pierna a otra y se ladea un poco más la cabeza.
+        p.weight = weightShift(t);
+        p.lean = -0.012;
+        p.headRoll += sin(t * 0.17) * 0.02;
         break;
 
       case "thinking":
