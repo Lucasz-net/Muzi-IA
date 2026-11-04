@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 assets/models/*.vrm
 !assets/models/.gitkeep
+
+# Animaciones de Mixamo del usuario (la licencia no permite redistribuirlas como archivos sueltos)
+assets/animations/*.fbx

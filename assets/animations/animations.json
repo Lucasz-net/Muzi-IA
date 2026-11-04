@@ -1,0 +1,12 @@
+{
+  "idle": [
+    { "file": "Idle.fbx", "weight": 3 },
+    { "file": "Look Around.fbx", "weight": 2 },
+    { "file": "Dwarf Idle.fbx", "weight": 2 },
+    { "file": "Kawaii Kaiwai.fbx", "weight": 1 }
+  ],
+  "responding": { "file": "Talking.fbx", "loop": true },
+  "working": { "file": "Texting While Standing.fbx", "loop": true },
+  "waiting_permission": { "file": "Standing Greeting.fbx", "loop": true },
+  "celebrating": { "file": "Happy Idle.fbx" }
+}
