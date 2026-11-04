@@ -1,3 +1,19 @@
+:root {
+  --glass: rgba(24, 28, 40, 0.88);
+  --glass-solid: rgba(24, 28, 40, 0.96);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --text: #eef1f7;
+  --muted: #9aa4b8;
+  --accent: #7cc4ff;
+  --ok: #6ee7a0;
+  --danger: #ff7a7a;
+
+  /* Distribución de la ventana (680 px): [diálogo][personaje][columna de botones] */
+  --pad: 12px;
+  --dialog-w: 310px;
+  --side-w: 52px;
+}
+
 html,
 body {
   margin: 0;
@@ -7,20 +23,333 @@ body {
   overflow: hidden;
   user-select: none;
   font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text);
 }
 
+/* El personaje se renderiza en la franja central. */
 #stage {
   position: fixed;
-  inset: 0;
-  width: 100%;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--pad) + var(--dialog-w));
+  /* Un <canvas> es un elemento reemplazado: left+right no lo estiran, hace falta un ancho explícito. */
+  width: calc(100% - (var(--pad) + var(--dialog-w)) - (var(--pad) + var(--side-w) + 6px));
   height: 100%;
   display: block;
 }
 
-/* Capa de UI (chat, globo, paneles). Todo elemento que deba capturar clics
-   debe llevar la clase .interactive para el hit-test de click-through. */
+/* Capa de UI. Todo elemento que deba capturar clics lleva la clase .interactive
+   (la usa el hit-test de click-through) y pointer-events: auto. */
 #ui {
   position: fixed;
   inset: 0;
   pointer-events: none;
+}
+.interactive {
+  pointer-events: auto;
+}
+.hidden {
+  display: none !important;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* --- Diálogo lateral (izquierda del personaje) --- */
+.bubble {
+  position: absolute;
+  top: 70px;
+  left: var(--pad);
+  width: var(--dialog-w);
+  box-sizing: border-box;
+  max-height: calc(100% - 70px - 90px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+/* Colita que apunta al personaje. */
+.bubble::after {
+  content: "";
+  position: absolute;
+  right: -9px;
+  top: 28px;
+  border: 9px solid transparent;
+  border-right: 0;
+  border-left-color: var(--glass);
+}
+.bubble-status {
+  color: var(--accent);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bubble-status.empty {
+  display: none;
+}
+.bubble-body {
+  white-space: pre-wrap;
+  overflow-y: auto;
+  line-height: 1.45;
+  font-size: 13.5px;
+  user-select: text;
+}
+.bubble-body:empty {
+  display: none;
+}
+.history-open .bubble {
+  visibility: hidden;
+}
+
+/* --- Permisos --- */
+.permissions {
+  position: absolute;
+  left: var(--pad);
+  width: var(--dialog-w);
+  bottom: var(--pad);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chat-open .permissions {
+  bottom: 66px;
+}
+.perm-card {
+  padding: 10px 12px;
+  background: var(--glass-solid);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+.perm-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.perm-detail {
+  color: var(--text);
+  font-family: Consolas, monospace;
+  font-size: 11.5px;
+  max-height: 70px;
+  overflow-y: auto;
+  word-break: break-all;
+  white-space: pre-wrap;
+  margin-bottom: 4px;
+}
+.perm-note {
+  color: var(--muted);
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-bottom: 8px;
+}
+.perm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+.btn {
+  padding: 5px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.08);
+}
+.btn.accept {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #0b2416;
+  font-weight: 600;
+}
+.btn.reject:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* --- Columna de botones (derecha del personaje) --- */
+.side {
+  position: absolute;
+  right: var(--pad);
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--side-w);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 26px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.grip {
+  width: 34px;
+  height: 14px;
+  line-height: 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: -2px;
+  cursor: grab;
+}
+.grip:hover {
+  color: var(--text);
+}
+.side-sep {
+  width: 24px;
+  height: 1px;
+  background: var(--glass-border);
+}
+.icon-btn,
+.send-btn {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 15px;
+  line-height: 1;
+}
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.icon-btn.active {
+  background: var(--accent);
+  color: #08202f;
+}
+.icon-btn.stop {
+  background: var(--danger);
+  color: #2a0a0a;
+}
+.icon-btn.quit:hover {
+  background: var(--danger);
+  color: #2a0a0a;
+}
+
+/* --- Barra de chat (oculta por defecto) --- */
+.bar {
+  position: absolute;
+  left: var(--pad);
+  right: calc(var(--pad) + var(--side-w) + 10px);
+  bottom: var(--pad);
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 6px 6px 6px 12px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.field {
+  flex: 1;
+  resize: none;
+  min-height: 20px;
+  max-height: 96px;
+  padding: 7px 4px;
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  outline: none;
+  user-select: text;
+}
+.field::placeholder {
+  color: var(--muted);
+}
+.send-btn {
+  background: var(--accent);
+  color: #08202f;
+}
+.send-btn.stop {
+  background: var(--danger);
+  color: #2a0a0a;
+}
+
+/* --- Historial (columna izquierda) --- */
+.history {
+  position: absolute;
+  left: var(--pad);
+  width: var(--dialog-w);
+  top: var(--pad);
+  bottom: var(--pad);
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-solid);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.chat-open .history {
+  bottom: 66px;
+}
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--glass-border);
+  font-weight: 600;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  padding: 0;
+}
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  user-select: text;
+}
+.entry {
+  white-space: pre-wrap;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.entry.user {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 5px 10px;
+  border-radius: 10px;
+  background: rgba(124, 196, 255, 0.22);
+}
+.entry.tool {
+  color: var(--muted);
+  font-family: Consolas, monospace;
+  font-size: 11.5px;
+}
+.entry.tool.ok::after {
+  content: " ✓";
+  color: var(--ok);
+}
+.entry.tool.failed::after {
+  content: " ✗";
+  color: var(--danger);
+}
+.entry.system {
+  color: var(--accent);
+  font-size: 11.5px;
+}
+.entry.error {
+  color: var(--danger);
 }
