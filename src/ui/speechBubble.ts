@@ -1,24 +1,50 @@
 import type { AgentEvent } from "../core/events";
 import { el } from "./dom";
+import { icon } from "./icons";
+import { renderMarkdown } from "./markdown";
 
-/** Globo de diálogo con la respuesta actual y una línea de estado. */
+/** Globo de diálogo junto al personaje: etiqueta con el nombre, estado y la respuesta con formato. */
 export function createSpeechBubble(parent: HTMLElement) {
-  const status = el("div", { class: "bubble-status" });
+  const status = el("span", { class: "bubble-status" });
+  const closeBtn = el("button", { class: "bubble-close", title: "Ocultar", interactive: true }, icon("close"));
+  const head = el(
+    "div",
+    { class: "bubble-head" },
+    el("span", { class: "bubble-name", text: "Mizu" }),
+    status,
+    closeBtn,
+  );
   const body = el("div", { class: "bubble-body" });
-  const root = el("div", { class: "bubble hidden", interactive: true, title: "Clic para ocultar" }, status, body);
-  root.addEventListener("click", () => root.classList.add("hidden"));
+  const root = el("div", { class: "bubble hidden", interactive: true }, head, body);
   parent.append(root);
+
+  const hide = () => root.classList.add("hidden");
+  closeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    hide();
+  });
+  root.addEventListener("dblclick", hide);
 
   let text = "";
   let newBlock = true; // el siguiente fragmento empieza un bloque de texto nuevo
 
-  const show = () => root.classList.remove("hidden");
-  const setStatus = (s: string) => {
+  const show = () => {
+    if (root.classList.contains("hidden")) {
+      root.classList.remove("hidden");
+      // Reinicia la animación de entrada.
+      root.classList.remove("pop");
+      void root.offsetWidth;
+      root.classList.add("pop");
+    }
+  };
+  const setStatus = (s: string, busy = false) => {
     status.textContent = s;
     status.classList.toggle("empty", !s);
+    status.classList.toggle("busy", busy);
   };
   const render = () => {
-    body.textContent = text;
+    body.innerHTML = renderMarkdown(text);
+    body.classList.toggle("empty", !text);
     body.scrollTop = body.scrollHeight;
   };
 
@@ -28,16 +54,16 @@ export function createSpeechBubble(parent: HTMLElement) {
       text = "";
       newBlock = true;
       render();
-      setStatus("Pensando…");
+      setStatus("Pensando", true);
       show();
     },
     handle(ev: AgentEvent) {
       switch (ev.type) {
         case "thinking":
-          if (!text) setStatus("Pensando…");
+          if (!text) setStatus("Pensando", true);
           break;
         case "tool_use":
-          setStatus(`Trabajando — ${ev.summary}`);
+          setStatus(ev.summary, true);
           newBlock = true;
           show();
           break;

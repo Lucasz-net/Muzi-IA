@@ -15,13 +15,20 @@ struct CursorPayload {
     y: f64,
 }
 
-/// Coloca la ventana abajo a la derecha del monitor principal (área de trabajo).
+/// Ancho (px lógicos) de cada franja lateral de la ventana (diálogo). Debe coincidir con
+/// `--zone` en `src/style.css`: la ventana es simétrica y el personaje queda en el centro.
+const SIDE_ZONE: f64 = 320.0;
+
+/// Coloca el personaje abajo a la derecha del monitor principal (área de trabajo). La franja
+/// derecha, vacía, queda fuera de la pantalla; el diálogo sale por la izquierda.
 pub fn anchor_bottom_right(window: &WebviewWindow) -> tauri::Result<()> {
     if let Some(monitor) = window.primary_monitor()? {
         let work = monitor.work_area();
         let size = window.outer_size()?;
-        let margin = (16.0 * monitor.scale_factor()) as i32;
-        let x = work.position.x + work.size.width as i32 - size.width as i32 - margin;
+        let scale = monitor.scale_factor();
+        let margin = (16.0 * scale) as i32;
+        let zone = (SIDE_ZONE * scale) as i32;
+        let x = work.position.x + work.size.width as i32 - margin - (size.width as i32 - zone);
         let y = work.position.y + work.size.height as i32 - size.height as i32 - margin;
         window.set_position(tauri::PhysicalPosition::new(x, y))?;
     }

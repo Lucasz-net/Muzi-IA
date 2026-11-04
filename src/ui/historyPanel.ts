@@ -52,7 +52,7 @@ export function createHistoryPanel(parent: HTMLElement, onNewConversation: () =>
           break;
         case "tool_use":
           assistantEntry = null;
-          tools.set(ev.tool_id, add("tool", `⚙ ${ev.summary}`));
+          tools.set(ev.tool_id, add("tool", ev.summary));
           break;
         case "tool_result": {
           const node = tools.get(ev.tool_id);

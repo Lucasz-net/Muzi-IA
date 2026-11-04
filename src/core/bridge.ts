@@ -2,6 +2,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { AgentConfig, AgentEvent, ConfigView } from "./events";
 
+/** Posición global del cursor relativa a la ventana (px lógicos), emitida por el backend. */
+export const cursor = {
+  onMove(handler: (x: number, y: number) => void): Promise<UnlistenFn> {
+    return listen<{ x: number; y: number }>("cursor-moved", (e) => handler(e.payload.x, e.payload.y));
+  },
+};
+
 /** Control de la aplicación (cierre). */
 export const app = {
   quit: () => invoke<void>("quit_app"),

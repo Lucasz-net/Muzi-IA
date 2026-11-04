@@ -15,8 +15,8 @@
       {
         "label": "main",
         "title": "Mizu-IA",
-        "width": 680,
-        "height": 600,
+        "width": 1040,
+        "height": 680,
         "transparent": true,
         "decorations": false,
         "alwaysOnTop": true,

@@ -1,5 +1,6 @@
 import { agent } from "../core/bridge";
 import { el } from "./dom";
+import { setIcon } from "./icons";
 
 export interface ChatInputHandlers {
   onSubmit: (text: string) => void;
@@ -13,7 +14,8 @@ export function createChatInput(parent: HTMLElement, h: ChatInputHandlers) {
   field.rows = 1;
   field.placeholder = "Escríbele algo…";
   field.spellcheck = false;
-  const sendBtn = el("button", { class: "send-btn", text: "➤", title: "Enviar", interactive: true });
+  const sendBtn = el("button", { class: "send-btn", title: "Enviar", interactive: true });
+  setIcon(sendBtn, "send");
   const bar = el("div", { class: "bar hidden", interactive: true }, field, sendBtn);
   parent.append(bar);
 
@@ -57,7 +59,7 @@ export function createChatInput(parent: HTMLElement, h: ChatInputHandlers) {
     },
     setBusy(value: boolean) {
       busy = value;
-      sendBtn.textContent = value ? "■" : "➤";
+      setIcon(sendBtn, value ? "stop" : "send");
       sendBtn.title = value ? "Detener" : "Enviar";
       sendBtn.classList.toggle("stop", value);
     },

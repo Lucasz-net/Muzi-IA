@@ -1,17 +1,19 @@
 :root {
-  --glass: rgba(24, 28, 40, 0.88);
-  --glass-solid: rgba(24, 28, 40, 0.96);
-  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass: rgba(24, 28, 42, 0.9);
+  --glass-solid: rgba(24, 28, 42, 0.97);
+  --glass-border: rgba(255, 255, 255, 0.13);
   --text: #eef1f7;
   --muted: #9aa4b8;
   --accent: #7cc4ff;
   --ok: #6ee7a0;
   --danger: #ff7a7a;
 
-  /* Distribución de la ventana (680 px): [diálogo][personaje][columna de botones] */
+  /* Ventana simétrica (1040 px): [franja de diálogo][personaje][franja de diálogo].
+     --zone debe coincidir con SIDE_ZONE en src-tauri/src/window.rs. */
+  --zone: 320px;
   --pad: 12px;
-  --dialog-w: 310px;
-  --side-w: 52px;
+  --menu-gap: 112px; /* distancia del menú al centro del personaje */
+  --col-w: calc(var(--zone) - var(--pad) - 16px); /* ancho de diálogo/historial/permisos */
 }
 
 html,
@@ -31,12 +33,17 @@ body {
 #stage {
   position: fixed;
   top: 0;
-  bottom: 0;
-  left: calc(var(--pad) + var(--dialog-w));
+  left: var(--zone);
   /* Un <canvas> es un elemento reemplazado: left+right no lo estiran, hace falta un ancho explícito. */
-  width: calc(100% - (var(--pad) + var(--dialog-w)) - (var(--pad) + var(--side-w) + 6px));
+  width: calc(100% - 2 * var(--zone));
   height: 100%;
   display: block;
+}
+
+/* Plano medio: el cuerpo se corta a medio muslo y se difumina hacia abajo en vez de verse rebanado. */
+[data-view="upper"] #stage {
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 80%, transparent 98%);
+  mask-image: linear-gradient(to bottom, #000 0, #000 80%, transparent 98%);
 }
 
 /* Capa de UI. Todo elemento que deba capturar clics lleva la clase .interactive
@@ -58,37 +65,88 @@ button {
   color: inherit;
   cursor: pointer;
 }
+svg {
+  display: block;
+}
 
-/* --- Diálogo lateral (izquierda del personaje) --- */
-.bubble {
+/* --- Columna del lado del diálogo: por defecto a la izquierda del personaje --- */
+.bubble,
+.permissions,
+.history {
   position: absolute;
-  top: 70px;
   left: var(--pad);
-  width: var(--dialog-w);
+  width: var(--col-w);
   box-sizing: border-box;
-  max-height: calc(100% - 70px - 90px);
+}
+[data-dialog="right"] .bubble,
+[data-dialog="right"] .permissions,
+[data-dialog="right"] .history {
+  left: auto;
+  right: var(--pad);
+}
+
+/* --- Globo de diálogo --- */
+.bubble {
+  top: 64px;
+  max-height: calc(100% - 64px - 90px);
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
-  background: var(--glass);
+  gap: 6px;
+  padding: 10px 14px 12px;
+  background: linear-gradient(180deg, rgba(36, 42, 62, 0.95), rgba(24, 28, 42, 0.95));
   border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
+  border-radius: 18px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
+  transform-origin: 100% 30px;
+}
+[data-dialog="right"] .bubble {
+  transform-origin: 0 30px;
+}
+.bubble.pop {
+  animation: pop 0.18s ease-out;
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(4px);
+  }
 }
 /* Colita que apunta al personaje. */
 .bubble::after {
   content: "";
   position: absolute;
+  top: 24px;
   right: -9px;
-  top: 28px;
   border: 9px solid transparent;
   border-right: 0;
-  border-left-color: var(--glass);
+  border-left-color: rgba(30, 35, 52, 0.95);
+}
+[data-dialog="right"] .bubble::after {
+  right: auto;
+  left: -9px;
+  border-right: 9px solid rgba(30, 35, 52, 0.95);
+  border-left: 0;
+}
+.bubble-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+.bubble-name {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(124, 196, 255, 0.18);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
 .bubble-status {
-  color: var(--accent);
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
   font-size: 11.5px;
   white-space: nowrap;
   overflow: hidden;
@@ -97,15 +155,100 @@ button {
 .bubble-status.empty {
   display: none;
 }
+.bubble-status.busy::after {
+  content: "";
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+  animation: dots 1.2s steps(4, end) infinite;
+}
+@keyframes dots {
+  0% {
+    content: "";
+  }
+  25% {
+    content: ".";
+  }
+  50% {
+    content: "..";
+  }
+  75% {
+    content: "...";
+  }
+}
+.bubble-close {
+  flex: none;
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  padding: 3px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.bubble:hover .bubble-close {
+  opacity: 1;
+}
+.bubble-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
 .bubble-body {
-  white-space: pre-wrap;
   overflow-y: auto;
-  line-height: 1.45;
+  line-height: 1.5;
   font-size: 13.5px;
   user-select: text;
+  word-break: break-word;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
 }
-.bubble-body:empty {
+.bubble-body.empty {
   display: none;
+}
+.bubble-body strong {
+  color: #fff;
+}
+.bubble-body code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  font-family: Consolas, monospace;
+  font-size: 12px;
+}
+.bubble-body pre {
+  margin: 6px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow-x: auto;
+}
+.bubble-body pre code {
+  padding: 0;
+  background: none;
+  white-space: pre;
+}
+.md-gap {
+  height: 6px;
+}
+.md-h {
+  margin-top: 2px;
+  font-weight: 600;
+  color: #fff;
+}
+.md-li {
+  display: flex;
+  gap: 6px;
+}
+.md-mark {
+  flex: none;
+  min-width: 0.9em;
+  color: var(--accent);
 }
 .history-open .bubble {
   visibility: hidden;
@@ -113,9 +256,6 @@ button {
 
 /* --- Permisos --- */
 .permissions {
-  position: absolute;
-  left: var(--pad);
-  width: var(--dialog-w);
   bottom: var(--pad);
   display: flex;
   flex-direction: column;
@@ -128,7 +268,7 @@ button {
   padding: 10px 12px;
   background: var(--glass-solid);
   border: 1px solid var(--accent);
-  border-radius: 12px;
+  border-radius: 14px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 }
 .perm-title {
@@ -176,66 +316,98 @@ button {
   color: var(--danger);
 }
 
-/* --- Columna de botones (derecha del personaje) --- */
-.side {
+/* --- Menú desplegable (en el borde exterior del personaje, opuesto al diálogo) --- */
+/* Junto al personaje: el centro de la ventana es el centro del personaje. */
+.menu {
   position: absolute;
-  right: var(--pad);
-  top: 50%;
-  transform: translateY(-50%);
-  width: var(--side-w);
-  box-sizing: border-box;
+  top: 34%;
+  left: calc(50% + var(--menu-gap));
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 8px 0;
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  border-radius: 26px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
 }
-.grip {
-  width: 34px;
-  height: 14px;
-  line-height: 14px;
-  text-align: center;
-  color: var(--muted);
-  font-size: 13px;
-  letter-spacing: -2px;
-  cursor: grab;
+[data-dialog="right"] .menu {
+  left: auto;
+  right: calc(50% + var(--menu-gap));
 }
-.grip:hover {
-  color: var(--text);
-}
-.side-sep {
-  width: 24px;
-  height: 1px;
-  background: var(--glass-border);
-}
-.icon-btn,
-.send-btn {
+.icon-btn {
   width: 34px;
   height: 34px;
-  flex: none;
-  border: none;
+  padding: 0;
+  display: grid;
+  place-items: center;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 15px;
-  line-height: 1;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(20, 24, 36, 0.62);
+  color: #e8ecf6;
+  transition:
+    background 0.12s,
+    opacity 0.15s,
+    transform 0.15s,
+    visibility 0.15s;
+}
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
 }
 .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(40, 48, 72, 0.9);
 }
 .icon-btn.active {
   background: var(--accent);
+  border-color: var(--accent);
   color: #08202f;
+}
+/* El punto plegado: casi invisible hasta que se acerca el ratón. */
+.menu-trigger {
+  width: 28px;
+  height: 28px;
+  opacity: 0.4;
+  background: rgba(20, 24, 36, 0.4);
+  cursor: grab;
+}
+.menu-trigger svg {
+  width: 16px;
+  height: 16px;
+}
+.menu-trigger:hover,
+.menu.open .menu-trigger {
+  opacity: 1;
 }
 .icon-btn.stop {
   background: var(--danger);
+  border-color: var(--danger);
   color: #2a0a0a;
+}
+.menu-items {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.menu-items > * {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.9);
+  visibility: hidden; /* plegado: no captura clics ni cuenta para el click-through */
+  transition:
+    opacity 0.15s,
+    transform 0.15s,
+    visibility 0.15s;
+}
+.menu.open .menu-items > * {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+}
+.menu-sep {
+  width: 18px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.25);
 }
 .icon-btn.quit:hover {
   background: var(--danger);
+  border-color: var(--danger);
   color: #2a0a0a;
 }
 
@@ -243,16 +415,21 @@ button {
 .bar {
   position: absolute;
   left: var(--pad);
-  right: calc(var(--pad) + var(--side-w) + 10px);
   bottom: var(--pad);
+  width: 460px;
+  box-sizing: border-box;
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  padding: 6px 6px 6px 12px;
+  padding: 6px 6px 6px 14px;
   background: var(--glass);
   border: 1px solid var(--glass-border);
-  border-radius: 18px;
+  border-radius: 20px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+[data-dialog="right"] .bar {
+  left: auto;
+  right: var(--pad);
 }
 .field {
   flex: 1;
@@ -271,26 +448,35 @@ button {
   color: var(--muted);
 }
 .send-btn {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
   background: var(--accent);
   color: #08202f;
+}
+.send-btn svg {
+  width: 17px;
+  height: 17px;
 }
 .send-btn.stop {
   background: var(--danger);
   color: #2a0a0a;
 }
 
-/* --- Historial (columna izquierda) --- */
+/* --- Historial (misma columna que el diálogo) --- */
 .history {
-  position: absolute;
-  left: var(--pad);
-  width: var(--dialog-w);
   top: var(--pad);
   bottom: var(--pad);
   display: flex;
   flex-direction: column;
   background: var(--glass-solid);
   border: 1px solid var(--glass-border);
-  border-radius: 14px;
+  border-radius: 16px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   overflow: hidden;
 }
@@ -320,6 +506,8 @@ button {
   flex-direction: column;
   gap: 6px;
   user-select: text;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
 }
 .entry {
   white-space: pre-wrap;
@@ -334,17 +522,32 @@ button {
   background: rgba(124, 196, 255, 0.22);
 }
 .entry.tool {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   color: var(--muted);
   font-family: Consolas, monospace;
   font-size: 11.5px;
 }
+.entry.tool::before,
+.entry.tool::after {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.entry.tool::after {
+  order: 2;
+  margin-left: auto;
+  background: transparent;
+}
 .entry.tool.ok::after {
-  content: " ✓";
-  color: var(--ok);
+  background: var(--ok);
 }
 .entry.tool.failed::after {
-  content: " ✗";
-  color: var(--danger);
+  background: var(--danger);
 }
 .entry.system {
   color: var(--accent);
