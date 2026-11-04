@@ -1,12 +1,13 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { agent, app } from "./core/bridge";
+import { agent, app, cursor } from "./core/bridge";
 import { setupClickThrough } from "./core/clickThrough";
 import { createStateMachine } from "./core/stateMachine";
 import { createScene } from "./character/scene";
 import { createChatInput } from "./ui/chatInput";
 import { createHistoryPanel } from "./ui/historyPanel";
 import { createPermissionPrompt } from "./ui/permissionPrompt";
-import { createSideButtons } from "./ui/sideButtons";
+import { watchDialogSide } from "./ui/layout";
+import { createMenu } from "./ui/menu";
 import { createSpeechBubble } from "./ui/speechBubble";
 import { createAnnouncer } from "./voice/announcer";
 import { createTTS } from "./voice/webSpeechProvider";
@@ -23,14 +24,44 @@ machine.onChange((state) => stage.setState(state));
 const tts = createTTS();
 const announcer = createAnnouncer(tts);
 
+// La voz mueve la boca (lipsync) y el cursor atrae la mirada.
+tts.onSpeakingChange((speaking) => stage.setSpeaking(speaking));
+tts.onBoundary(() => stage.pulseMouth());
+cursor.onMove((x, y) => stage.setGaze(x, y)).catch(console.error);
+
 // Depuración en desarrollo (consola de la ventana): `mizu.force("celebrating")`, `mizuSay("hola")`.
 if (import.meta.env.DEV) {
-  Object.assign(window, { mizu: machine, mizuSay: (text: string) => tts.speak(text) });
+  const mizuHelp = () =>
+    console.info(`Comandos de prueba (consola de la ventana: F12 o clic derecho > Inspeccionar)
+  mizu.force("idle" | "thinking" | "working" | "waiting_permission" | "responding" | "celebrating" | "error")
+  mizuStage.listClips()                    lista los clips de animación cargados
+  mizuStage.playClip("Nombre.fbx")         reproduce un clip a mano
+  mizuStage.playClip(null)                 detiene el clip
+  mizuStage.playClip()                     vuelve al comportamiento por estado
+  mizuStage.setView("full" | "upper")      cuerpo completo / plano medio
+  mizuStage.debug.orbit(Math.PI / 2)       cámara de perfil (orbit(0) la restaura)
+  mizuStage.setSpeaking(true | false)      lipsync sin audio
+  mizuSay("texto")                         voz + lipsync
+  mizuUi.bubble.handle({ type: "message", text: "**hola**", is_delta: false })   probar el globo
+Clips cargados: ${stage.listClips().join(", ") || "(ninguno todavía)"}`);
+  Object.assign(window, { mizu: machine, mizuSay: (text: string) => tts.speak(text), mizuStage: stage, mizuHelp });
 }
 
+// --- Vista (cuerpo completo / plano medio), recordada entre sesiones ---
+const VIEW_KEY = "mizu.view";
+let view: "full" | "upper" = "full";
+try {
+  if (localStorage.getItem(VIEW_KEY) === "upper") view = "upper";
+} catch {
+  /* sin almacenamiento: vista por defecto */
+}
+stage.setView(view);
+
 // --- UI ---
+watchDialogSide(canvas);
 const bubble = createSpeechBubble(ui);
 const permissions = createPermissionPrompt(ui);
+if (import.meta.env.DEV) Object.assign(window, { mizuUi: { bubble } });
 const history = createHistoryPanel(ui, () => {
   agent.newConversation().catch(console.error);
   bubble.reset();
@@ -63,7 +94,7 @@ const input = createChatInput(ui, {
   },
 });
 
-const side = createSideButtons(ui, {
+const side = createMenu(ui, {
   voiceEnabled: announcer.enabled,
   onToggleChat: () => input.toggle(),
   onToggleHistory: () => {
@@ -74,6 +105,17 @@ const side = createSideButtons(ui, {
   onToggleVoice: () => {
     announcer.setEnabled(!announcer.enabled);
     return announcer.enabled;
+  },
+  view,
+  onToggleView: () => {
+    view = view === "full" ? "upper" : "full";
+    stage.setView(view);
+    try {
+      localStorage.setItem(VIEW_KEY, view);
+    } catch {
+      /* se pierde solo al cerrar */
+    }
+    return view;
   },
   onStop: () => agent.stop().catch(console.error),
   onQuit: () => app.quit().catch(console.error),
