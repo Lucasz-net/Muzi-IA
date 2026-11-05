@@ -1,5 +1,6 @@
 import { agent } from "../core/bridge";
 import type { AgentEvent } from "../core/events";
+import { suggestRule, type RuleStore } from "../core/permissionRules";
 import { el } from "./dom";
 
 type Input = Record<string, unknown>;
@@ -41,8 +42,11 @@ function describe(tool: string, raw: unknown, description?: string | null) {
   }
 }
 
-/** Solicitudes de permiso con botones Aceptar / Rechazar (en cola si hay varias). */
-export function createPermissionPrompt(parent: HTMLElement) {
+/**
+ * Solicitudes de permiso con botones Rechazar / Siempre / Aceptar (en cola si hay varias). "Siempre" recuerda una
+ * regla estrecha (ver `core/permissionRules.ts`) y deja de preguntar lo mismo; solo se ofrece si es seguro.
+ */
+export function createPermissionPrompt(parent: HTMLElement, rules: RuleStore) {
   const root = el("div", { class: "permissions" });
   parent.append(root);
 
@@ -55,12 +59,29 @@ export function createPermissionPrompt(parent: HTMLElement) {
   };
 
   return {
+    /** Si una regla recordada cubre la petición, la aprueba sin preguntar y devuelve true. */
+    tryAutoAllow(ev: AgentEvent): boolean {
+      if (ev.type !== "waiting_permission") return false;
+      const rule = rules.find(ev.tool_name, ev.input);
+      if (!rule) return false;
+      agent.respondPermission(ev.request_id, true).catch(console.error);
+      return true;
+    },
     handle(ev: AgentEvent) {
       if (ev.type === "waiting_permission") {
         const { title, detail, note } = describe(ev.tool_name, ev.input, ev.description);
         const accept = el("button", { class: "btn accept", text: "Aceptar", interactive: true });
         const reject = el("button", { class: "btn reject", text: "Rechazar", interactive: true });
         accept.addEventListener("click", () => resolve(ev.request_id, true));
+        const suggestion = suggestRule(ev.tool_name, ev.input);
+        const always = suggestion
+          ? el("button", { class: "btn always", text: "Siempre", title: `Aceptar y no volver a preguntar:
+${suggestion.label}`, interactive: true })
+          : null;
+        always?.addEventListener("click", () => {
+          rules.add(suggestion!);
+          resolve(ev.request_id, true);
+        });
         reject.addEventListener("click", () => resolve(ev.request_id, false));
         const card = el(
           "div",
@@ -69,7 +90,8 @@ export function createPermissionPrompt(parent: HTMLElement) {
           el("div", { class: "perm-detail", text: detail }),
         );
         if (note) card.append(el("div", { class: "perm-note", text: note }));
-        card.append(el("div", { class: "perm-actions" }, reject, accept));
+        card.append(el("div", { class: "perm-actions" }, ...(always ? [reject, always, accept] : [reject, accept])));
+        if (suggestion) card.append(el("div", { class: "perm-rule", text: `«Siempre» = ${suggestion.label}` }));
         cards.set(ev.request_id, card);
         root.append(card);
       } else if (ev.type === "idle" || ev.type === "error" || ev.type === "done") {

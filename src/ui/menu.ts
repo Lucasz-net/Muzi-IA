@@ -6,7 +6,13 @@ import { icon, setIcon } from "./icons";
 
 export interface MenuHandlers {
   onToggleChat: () => void;
+  /** Pulsar el micrófono: empieza a escuchar, o corta la escucha en curso. */
+  onToggleMic: () => void;
+  /** Enciende o apaga la escucha continua (palabra de activación "Mizu"). */
+  onToggleWake: () => void;
   onToggleHistory: () => void;
+  /** Abre o cierra el panel de permisos recordados («Siempre»). */
+  onToggleRules: () => void;
   /** Alterna la voz; devuelve el nuevo estado. */
   onToggleVoice: () => boolean;
   voiceEnabled: boolean;
@@ -36,8 +42,11 @@ export function createMenu(parent: HTMLElement, h: MenuHandlers) {
   const trigger = btn("menu", "Menú (arrastra para mover la ventana)", "menu-trigger");
   const stopBtn = btn("stop", "Detener la tarea", "stop hidden");
   const chatBtn = btn("chat", "Abrir chat");
+  const micBtn = btn("mic", "Hablar con Mizu", "mic");
+  const wakeBtn = btn("ear", "Escucha continua: di «Mizu» para hablarle", "wake");
   const folderBtn = btn("folder", "Carpeta de trabajo");
   const historyBtn = btn("history", "Historial");
+  const rulesBtn = btn("shield", "Permisos recordados");
   const voiceBtn = btn("volume", "");
   const viewBtn = btn("zoomIn", "");
   const quitBtn = btn("close", "Cerrar Mizu-IA", "quit");
@@ -46,8 +55,11 @@ export function createMenu(parent: HTMLElement, h: MenuHandlers) {
     "div",
     { class: "menu-items" },
     chatBtn,
+    micBtn,
+    wakeBtn,
     folderBtn,
     historyBtn,
+    rulesBtn,
     voiceBtn,
     viewBtn,
     el("div", { class: "menu-sep" }),
@@ -108,7 +120,10 @@ export function createMenu(parent: HTMLElement, h: MenuHandlers) {
   viewBtn.addEventListener("click", () => showView(h.onToggleView()));
 
   chatBtn.addEventListener("click", h.onToggleChat);
+  micBtn.addEventListener("click", h.onToggleMic);
+  wakeBtn.addEventListener("click", h.onToggleWake);
   historyBtn.addEventListener("click", h.onToggleHistory);
+  rulesBtn.addEventListener("click", h.onToggleRules);
   voiceBtn.addEventListener("click", () => showVoice(h.onToggleVoice()));
   stopBtn.addEventListener("click", h.onStop);
   quitBtn.addEventListener("click", h.onQuit);
@@ -135,5 +150,25 @@ export function createMenu(parent: HTMLElement, h: MenuHandlers) {
       chatBtn.title = isOpen ? "Cerrar chat" : "Abrir chat";
     },
     setHistoryOpen: (isOpen: boolean) => historyBtn.classList.toggle("active", isOpen),
+    setRulesOpen: (isOpen: boolean) => rulesBtn.classList.toggle("active", isOpen),
+    /** Estado del micrófono: pulsa mientras escucha y se atenúa mientras prepara o transcribe. */
+    setMicState: (state: "idle" | "loading" | "listening" | "transcribing" | "standby") => {
+      micBtn.classList.toggle("listening", state === "listening");
+      micBtn.classList.toggle("standby", state === "standby");
+      micBtn.classList.toggle("working", state === "loading" || state === "transcribing");
+      micBtn.title =
+        state === "listening"
+          ? "Escuchando… (clic para terminar)"
+          : state === "standby"
+            ? "Atenta: di «Mizu» (clic para hablarle sin decirlo)"
+            : state === "idle"
+              ? "Hablar con Mizu"
+              : "Un momento…";
+    },
+    /** La escucha continua está encendida (el botón queda marcado). */
+    setWakeState: (on: boolean) => {
+      wakeBtn.classList.toggle("active", on);
+      wakeBtn.title = on ? "Escucha continua activada (clic para apagarla)" : "Escucha continua: di «Mizu» para hablarle";
+    },
   };
 }

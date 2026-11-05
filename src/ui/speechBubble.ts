@@ -49,6 +49,16 @@ export function createSpeechBubble(parent: HTMLElement) {
   };
 
   return {
+    /** Aviso temporal en la etiqueta de estado ("Escuchando…"); `null` lo quita y oculta el globo si está vacío. */
+    hint(message: string | null, busy = true) {
+      if (message === null) {
+        setStatus("");
+        if (!text) hide();
+        return;
+      }
+      setStatus(message, busy);
+      show();
+    },
     /** Llamar al enviar un mensaje del usuario. */
     reset() {
       text = "";

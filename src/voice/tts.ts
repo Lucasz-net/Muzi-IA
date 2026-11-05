@@ -2,9 +2,16 @@
  * Proveedor de síntesis de voz. La app solo conoce esta interfaz; para cambiar de motor
  * (Piper/Kokoro local, ElevenLabs...) se implementa otro `TTSProvider` y se elige en `createTTS`.
  */
+/**
+ * Ánimo con el que se dice una frase. Lo elige quien habla según lo que pasa (tests que pasan, un error, un permiso...)
+ * y el motor lo traduce a ritmo y entonación. `neutral` es la voz de siempre.
+ */
+export type Mood = "neutral" | "alegre" | "calma" | "atenta";
+
 export interface SpeakOptions {
   rate?: number;
   pitch?: number;
+  mood?: Mood;
 }
 
 export interface TTSProvider {

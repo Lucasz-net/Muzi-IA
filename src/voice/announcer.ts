@@ -1,11 +1,15 @@
 import type { AgentEvent } from "../core/events";
-import type { TTSProvider } from "./tts";
+import type { Mood, TTSProvider } from "./tts";
 
 const STORAGE_KEY = "mizu.voice";
 /** Una respuesta sin herramientas solo se anuncia si tardó al menos esto (ms). */
 const MIN_TASK_MS = 6000;
+/** Si ya se dijo algo hace menos de esto (ms), el aviso de "terminé" se omite para no pisarlo. */
+const QUIET_AFTER_SPEECH_MS = 6000;
 
-const DONE_PHRASES = ["Listo, terminé.", "Ya está, tarea completada.", "Terminé. Échale un vistazo."];
+// Cada grupo de frases se dice con su ánimo: contenta al terminar bien, serena ante un fallo, atenta al pedir algo.
+const DONE_PHRASES = ["¡Listo, terminé!", "¡Ya está, tarea completada!", "Terminé. Échale un vistazo."];
+const ROUGH_PHRASES = ["Terminé, pero hubo problemas por el camino. Échale un vistazo.", "Acabé, aunque no todo salió bien. Revísalo."];
 const ERROR_PHRASES = ["Algo salió mal.", "Hubo un error."];
 
 const TOOL_ACTIONS: Record<string, string> = {
@@ -32,13 +36,21 @@ function loadEnabled(): boolean {
  * Decide cuándo y qué dice el personaje: al terminar una tarea, al necesitar un permiso
  * y ante errores. No lee las respuestas completas.
  */
-export function createAnnouncer(tts: TTSProvider) {
+export interface AnnouncerOptions {
+  /** ¿La tarea que termina tuvo tropiezos (tests rotos, errores)? Cambia el tono y la frase de "terminé". */
+  isRough?: () => boolean;
+}
+
+export function createAnnouncer(tts: TTSProvider, { isRough = () => false }: AnnouncerOptions = {}) {
   let enabled = loadEnabled();
   let startedAt = 0;
   let toolsUsed = 0;
+  let lastSpokeAt = 0;
 
-  const say = (text: string) => {
-    if (enabled) tts.speak(text).catch(console.error);
+  const say = (text: string, mood: Mood = "neutral") => {
+    if (!enabled) return;
+    lastSpokeAt = Date.now();
+    tts.speak(text, { mood }).catch(console.error);
   };
 
   return {
@@ -54,6 +66,8 @@ export function createAnnouncer(tts: TTSProvider) {
         /* sin almacenamiento: solo vale para esta sesión */
       }
     },
+    /** Dice una frase (si la voz está activada). */
+    say,
     /** El usuario envió un mensaje: corta lo que estuviera diciendo y empieza a medir el turno. */
     userSent() {
       tts.cancel();
@@ -67,14 +81,15 @@ export function createAnnouncer(tts: TTSProvider) {
           break;
         case "waiting_permission": {
           const action = TOOL_ACTIONS[ev.tool_name] ?? `usar ${ev.tool_name}`;
-          say(`Necesito tu permiso para ${action}.`);
+          say(`Necesito tu permiso para ${action}.`, "atenta");
           break;
         }
         case "done":
-          if (toolsUsed > 0 || Date.now() - startedAt >= MIN_TASK_MS) say(pick(DONE_PHRASES));
+          if ((toolsUsed > 0 || Date.now() - startedAt >= MIN_TASK_MS) && Date.now() - lastSpokeAt > QUIET_AFTER_SPEECH_MS)
+            isRough() ? say(pick(ROUGH_PHRASES), "calma") : say(pick(DONE_PHRASES), "alegre");
           break;
         case "error":
-          say(pick(ERROR_PHRASES));
+          say(pick(ERROR_PHRASES), "calma");
           break;
         case "idle":
           tts.cancel(); // el usuario detuvo la tarea

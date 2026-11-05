@@ -28,6 +28,12 @@ export function createHistoryPanel(parent: HTMLElement, onNewConversation: () =>
   });
 
   return {
+    get open() {
+      return !root.classList.contains("hidden");
+    },
+    close() {
+      root.classList.add("hidden");
+    },
     toggle() {
       root.classList.toggle("hidden");
       scroll();

@@ -14,6 +14,11 @@ export default defineConfig(() => ({
   server: {
     port: 1420,
     strictPort: true,
+    // Aislamiento de origen cruzado: permite que Whisper (onnxruntime-web) use varios hilos con SharedArrayBuffer.
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "credentialless",
+    },
     host: host || false,
     hmr: host
       ? {

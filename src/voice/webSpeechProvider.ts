@@ -1,4 +1,12 @@
-import type { SpeakOptions, TTSProvider } from "./tts";
+import type { Mood, SpeakOptions, TTSProvider } from "./tts";
+
+/** Ritmo y tono de la voz de Windows para cada ánimo. */
+const MOOD_VOICE: Record<Mood, { rate: number; pitch: number }> = {
+  neutral: { rate: 1.05, pitch: 1.15 },
+  alegre: { rate: 1.15, pitch: 1.3 },
+  calma: { rate: 0.95, pitch: 1.0 },
+  atenta: { rate: 1.05, pitch: 1.2 },
+};
 
 /** TTS con la Web Speech API (SpeechSynthesis) del WebView. Sin dependencias ni red. */
 export class WebSpeechProvider implements TTSProvider {
@@ -42,8 +50,9 @@ export class WebSpeechProvider implements TTSProvider {
       const u = new SpeechSynthesisUtterance(text);
       if (this.voice) u.voice = this.voice;
       u.lang = this.voice?.lang ?? this.lang;
-      u.rate = opts.rate ?? 1.05;
-      u.pitch = opts.pitch ?? 1.15;
+      const mood = MOOD_VOICE[opts.mood ?? "neutral"];
+      u.rate = opts.rate ?? mood.rate;
+      u.pitch = opts.pitch ?? mood.pitch;
       u.onstart = () => this.setSpeaking(true);
       u.onboundary = (e) => this.boundaryCbs.forEach((cb) => cb(e.charIndex, text));
       const finish = () => {
