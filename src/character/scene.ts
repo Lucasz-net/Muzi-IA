@@ -5,7 +5,7 @@ import { findClipEntries } from "./animationSource";
 import { findModelUrl } from "./modelSource";
 import { createPlaceholder } from "./placeholder";
 import { proceduralPoses } from "./procedural";
-import type { Character } from "./types";
+import type { Character, GestureLevel } from "./types";
 import { loadVrmCharacter, uploadAndReleaseTextures } from "./vrmCharacter";
 
 export type ViewMode = "full" | "upper";
@@ -26,6 +26,8 @@ export interface CharacterScene {
   /** Solo desarrollo: lanza un gesto hecho con código ("wink", "smile", "nod"...). Devuelve false si no existe. */
   gesture: (name: string) => boolean;
   listGestures: () => string[];
+  /** Con qué frecuencia lanza gestos sola en reposo ("off", "pocos", "normal", "muchos"). */
+  setGestureLevel: (level: GestureLevel) => void;
   /** "full" = cuerpo completo; "upper" = plano medio (de medio muslo hacia arriba). */
   setView: (view: ViewMode) => void;
   /** Resuelve cuando se intentó cargar el modelo VRM (con éxito o no). */
@@ -112,6 +114,33 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
         })
     : Promise.resolve("placeholder" as const);
 
+  // --- La interfaz sigue a la cabeza: se publica su posición y tamaño en píxeles de la ventana (variables CSS) para que
+  // el globo de diálogo quede pegado al personaje, sea cual sea la vista (plano medio o cuerpo completo) ---
+  const rootStyle = document.documentElement.style;
+  const head = new THREE.Vector3();
+  const side = new THREE.Vector3();
+  const published = { x: NaN, y: NaN, r: NaN };
+  const publish = (name: string, value: number, key: keyof typeof published) => {
+    if (Math.abs(value - published[key]) < 1 || !Number.isFinite(value)) return;
+    published[key] = value;
+    rootStyle.setProperty(name, `${Math.round(value)}px`);
+  };
+  const trackHead = () => {
+    const p = character.headPosition?.();
+    if (!p) return;
+    camera.updateMatrixWorld();
+    const r = canvas.getBoundingClientRect();
+    head.copy(p).project(camera);
+    const x = r.left + (head.x * 0.5 + 0.5) * r.width;
+    const y = r.top + (-head.y * 0.5 + 0.5) * r.height;
+    // Radio de la cabeza en píxeles: un punto a 0,11 m a la derecha de la cámara.
+    side.setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar(0.11);
+    head.copy(p).add(side).project(camera);
+    publish("--head-x", x, "x");
+    publish("--head-y", y, "y");
+    publish("--head-r", Math.abs(r.left + (head.x * 0.5 + 0.5) * r.width - x), "r");
+  };
+
   // --- Hit-test por alfa del píxel renderizado (silueta exacta, sin raycast sobre mallas pesadas) ---
   const gl = renderer.getContext();
   const px = new Uint8Array(4);
@@ -130,6 +159,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     animator.update(t, dt);
     character.update?.(dt, t);
     renderer.render(scene, camera);
+    trackHead();
 
     if (probe) {
       // Debe leerse justo tras render(): el búfer de dibujo se descarta al componer.
@@ -169,6 +199,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     listClips: () => character.listClips?.() ?? [],
     gesture: (name) => character.gesture?.(name) ?? false,
     listGestures: () => character.listGestures?.() ?? [],
+    setGestureLevel: (level) => character.setGestureLevel?.(level),
     setView(next) {
       view = next;
       document.documentElement.dataset.view = next; // el CSS difumina el borde inferior en plano medio

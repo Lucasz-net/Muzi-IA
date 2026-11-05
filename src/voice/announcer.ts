@@ -33,24 +33,27 @@ function loadEnabled(): boolean {
 }
 
 /**
- * Decide cuándo y qué dice el personaje: al terminar una tarea, al necesitar un permiso
- * y ante errores. No lee las respuestas completas.
+ * Decide cuándo y qué dice el personaje en los avisos: al terminar una tarea, al necesitar un permiso y ante errores.
+ * La lectura de las respuestas la hace `narrator.ts`.
  */
 export interface AnnouncerOptions {
   /** ¿La tarea que termina tuvo tropiezos (tests rotos, errores)? Cambia el tono y la frase de "terminé". */
   isRough?: () => boolean;
+  /** Si devuelve true, el aviso de "terminé" se omite porque el narrador ya está contando el resultado. */
+  suppressDone?: () => boolean;
 }
 
-export function createAnnouncer(tts: TTSProvider, { isRough = () => false }: AnnouncerOptions = {}) {
+export function createAnnouncer(tts: TTSProvider, { isRough = () => false, suppressDone = () => false }: AnnouncerOptions = {}) {
   let enabled = loadEnabled();
   let startedAt = 0;
   let toolsUsed = 0;
   let lastSpokeAt = 0;
 
-  const say = (text: string, mood: Mood = "neutral") => {
+  /** `interrupt`: corta lo que esté sonando (un permiso no puede esperar detrás de una lectura larga); si no, se encola detrás. */
+  const say = (text: string, mood: Mood = "neutral", interrupt = false) => {
     if (!enabled) return;
     lastSpokeAt = Date.now();
-    tts.speak(text, { mood }).catch(console.error);
+    (!interrupt && tts.enqueue ? tts.enqueue(text, { mood }) : tts.speak(text, { mood })).catch(console.error);
   };
 
   return {
@@ -81,11 +84,15 @@ export function createAnnouncer(tts: TTSProvider, { isRough = () => false }: Ann
           break;
         case "waiting_permission": {
           const action = TOOL_ACTIONS[ev.tool_name] ?? `usar ${ev.tool_name}`;
-          say(`Necesito tu permiso para ${action}.`, "atenta");
+          say(`Necesito tu permiso para ${action}.`, "atenta", true);
           break;
         }
         case "done":
-          if ((toolsUsed > 0 || Date.now() - startedAt >= MIN_TASK_MS) && Date.now() - lastSpokeAt > QUIET_AFTER_SPEECH_MS)
+          if (
+            (toolsUsed > 0 || Date.now() - startedAt >= MIN_TASK_MS) &&
+            Date.now() - lastSpokeAt > QUIET_AFTER_SPEECH_MS &&
+            !suppressDone()
+          )
             isRough() ? say(pick(ROUGH_PHRASES), "calma") : say(pick(DONE_PHRASES), "alegre");
           break;
         case "error":

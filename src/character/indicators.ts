@@ -12,32 +12,35 @@ export interface Indicators {
 }
 
 /** @param height Distancia (m) del centro de la cabeza a los puntos/"!" que flotan encima. */
+/** Tamaño de los indicadores respecto al original: discretos, sin tapar la cara ni el globo. */
+const K = 0.45;
+
 export function createIndicators(height = 0.5): Indicators {
   const root = new THREE.Group();
 
   const thinking = new THREE.Group();
   thinking.position.y = height;
-  const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const dotMat = new THREE.MeshBasicMaterial({ color: 0xded5ff }); // lila claro, a juego con la interfaz
   const dots = [-1, 0, 1].map((i) => {
-    const d = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), dotMat);
-    d.position.x = i * 0.17;
+    const d = new THREE.Mesh(new THREE.SphereGeometry(0.055 * K, 12, 12), dotMat);
+    d.position.x = i * 0.17 * K;
     thinking.add(d);
     return d;
   });
 
   const alert = new THREE.Group();
   alert.position.y = height;
-  const alertMat = new THREE.MeshBasicMaterial({ color: 0xffc233 });
-  const bar = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.12, 4, 8), alertMat);
-  bar.position.y = 0.09;
-  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), alertMat);
-  dot.position.y = -0.1;
+  const alertMat = new THREE.MeshBasicMaterial({ color: 0xffd47a }); // ámbar suave
+  const bar = new THREE.Mesh(new THREE.CapsuleGeometry(0.05 * K, 0.12 * K, 4, 8), alertMat);
+  bar.position.y = 0.09 * K;
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.055 * K, 12, 12), alertMat);
+  dot.position.y = -0.1 * K;
   alert.add(bar, dot);
 
   const sparkles = new THREE.Group();
-  const sparkMat = new THREE.MeshBasicMaterial({ color: 0xfff08a });
+  const sparkMat = new THREE.MeshBasicMaterial({ color: 0xf1e6ff });
   const sparks = Array.from({ length: 6 }, () => {
-    const s = new THREE.Mesh(new THREE.OctahedronGeometry(0.07), sparkMat);
+    const s = new THREE.Mesh(new THREE.OctahedronGeometry(0.07 * K), sparkMat);
     sparkles.add(s);
     return s;
   });
@@ -56,7 +59,7 @@ export function createIndicators(height = 0.5): Indicators {
       if (thinking.visible) {
         dots.forEach((d, i) => {
           const w = Math.sin(time * 4 - i * 0.8);
-          d.position.y = w * 0.05;
+          d.position.y = w * 0.05 * K;
           d.scale.setScalar(0.75 + 0.25 * (w * 0.5 + 0.5));
         });
       }

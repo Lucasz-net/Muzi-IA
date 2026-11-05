@@ -4,19 +4,19 @@
     {"file":"Look Around.fbx","weight":2,"cooldown":95,"gap":[10,24]},
     {"file":"Dwarf Idle.fbx","weight":2,"cooldown":95,"gap":[8,22]},
     {"file":"Kawaii Kaiwai.fbx","weight":1,"cooldown":450,"gap":[25,50],
-      "face": {"mood":{"happy":0.5},"cues":[{"name":"wink","every":[6,11]},{"name":"laugh","every":[22,38]}]}
+      "face": {"mood":{"happy":0.5},"cues":[{"name":"wink","at":[5.4,12.7]},{"name":"laugh","at":[18.8]}]}
     },
     {"file":"bailetiktok2.fbx","weight":1,"cooldown":3240,"gap":[40,80],
-      "face": {"mood":{"happy":0.4},"cues":[{"name":"wink","every":[8,14]},{"name":"smile","every":[14,24]}]}
+      "face": {"mood":{"happy":0.4},"cues":[{"name":"wink","at":[3.3]}]}
     },
     {"file":"Bling-Bang-Bang-Born.fbx","weight":1,"cooldown":3780,"gap":[50,100],
-      "face": {"mood":{"happy":0.2},"cues":[{"name":"wink","every":[9,16]},{"name":"smile","every":[14,26]}]}
+      "face": {"mood":{"happy":0.2},"cues":[{"name":"wink","at":[5.5,14.6]},{"name":"smile","at":[16.8]}]}
     },
     {"file":"bailetiktok.fbx","weight":1,"cooldown":4500,"gap":[60,120],
-      "face": {"mood":{"happy":0.4},"cues":[{"name":"wink","every":[8,14]},{"name":"smile","every":[14,24]}]}
+      "face": {"mood":{"happy":0.4},"cues":[{"name":"wink","at":[13,22.5]},{"name":"smile","at":[15.7]}]}
     },
     {"file":"ハッピーシンセサイザ.fbx","weight":1,"cooldown":3780,"gap":[50,100],
-      "face": {"mood":{"happy":0.55},"cues":[{"name":"wink","every":[6,12]},{"name":"laugh","every":[25,40]}]}
+      "face": {"mood":{"happy":0.55},"cues":[{"name":"wink","at":[2.9,11.7]},{"name":"laugh","at":[14.3]}]}
     }
   ],
   "thinking": {"file": "Thinking.fbx"},

@@ -1,4 +1,4 @@
-import type { Object3D } from "three";
+import type { Object3D, Vector3 } from "three";
 import type { CompanionState } from "../core/stateMachine";
 
 /**
@@ -36,6 +36,9 @@ export interface PoseSource {
   poseFor(state: CompanionState, t: number, stateTime: number): Pose;
 }
 
+/** Cuántos gestos lanza el personaje por su cuenta en reposo. */
+export type GestureLevel = "off" | "pocos" | "normal" | "muchos";
+
 /** Contrato que cumple cualquier personaje (placeholder, VRM...). */
 export interface Character {
   root: Object3D;
@@ -64,4 +67,8 @@ export interface Character {
   gesture?(name: string): boolean;
   /** Nombres de los gestos disponibles. */
   listGestures?(): string[];
+  /** Posición en el mundo del centro de la cabeza (m); la interfaz coloca ahí el globo de diálogo. */
+  headPosition?(): Vector3 | null;
+  /** Con qué frecuencia lanza gestos sola en reposo. */
+  setGestureLevel?(level: GestureLevel): void;
 }

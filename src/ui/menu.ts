@@ -13,6 +13,8 @@ export interface MenuHandlers {
   onToggleHistory: () => void;
   /** Abre o cierra el panel de permisos recordados («Siempre»). */
   onToggleRules: () => void;
+  /** Abre o cierra el panel de ajustes. */
+  onToggleSettings: () => void;
   /** Alterna la voz; devuelve el nuevo estado. */
   onToggleVoice: () => boolean;
   voiceEnabled: boolean;
@@ -47,6 +49,7 @@ export function createMenu(parent: HTMLElement, h: MenuHandlers) {
   const folderBtn = btn("folder", "Carpeta de trabajo");
   const historyBtn = btn("history", "Historial");
   const rulesBtn = btn("shield", "Permisos recordados");
+  const settingsBtn = btn("sliders", "Ajustes");
   const voiceBtn = btn("volume", "");
   const viewBtn = btn("zoomIn", "");
   const quitBtn = btn("close", "Cerrar Mizu-IA", "quit");
@@ -60,6 +63,7 @@ export function createMenu(parent: HTMLElement, h: MenuHandlers) {
     folderBtn,
     historyBtn,
     rulesBtn,
+    settingsBtn,
     voiceBtn,
     viewBtn,
     el("div", { class: "menu-sep" }),
@@ -124,6 +128,7 @@ export function createMenu(parent: HTMLElement, h: MenuHandlers) {
   wakeBtn.addEventListener("click", h.onToggleWake);
   historyBtn.addEventListener("click", h.onToggleHistory);
   rulesBtn.addEventListener("click", h.onToggleRules);
+  settingsBtn.addEventListener("click", h.onToggleSettings);
   voiceBtn.addEventListener("click", () => showVoice(h.onToggleVoice()));
   stopBtn.addEventListener("click", h.onStop);
   quitBtn.addEventListener("click", h.onQuit);
@@ -151,6 +156,7 @@ export function createMenu(parent: HTMLElement, h: MenuHandlers) {
     },
     setHistoryOpen: (isOpen: boolean) => historyBtn.classList.toggle("active", isOpen),
     setRulesOpen: (isOpen: boolean) => rulesBtn.classList.toggle("active", isOpen),
+    setSettingsOpen: (isOpen: boolean) => settingsBtn.classList.toggle("active", isOpen),
     /** Estado del micrófono: pulsa mientras escucha y se atenúa mientras prepara o transcribe. */
     setMicState: (state: "idle" | "loading" | "listening" | "transcribing" | "standby") => {
       micBtn.classList.toggle("listening", state === "listening");

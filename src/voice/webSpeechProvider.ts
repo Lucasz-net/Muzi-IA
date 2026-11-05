@@ -46,6 +46,16 @@ export class WebSpeechProvider implements TTSProvider {
   speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     if (!this.available || !text.trim()) return Promise.resolve();
     speechSynthesis.cancel();
+    return this.say(text, opts);
+  }
+
+  /** Sin cortar lo que suena: SpeechSynthesis ya trae su propia cola. */
+  enqueue(text: string, opts: SpeakOptions = {}): Promise<void> {
+    if (!this.available || !text.trim()) return Promise.resolve();
+    return this.say(text, opts);
+  }
+
+  private say(text: string, opts: SpeakOptions): Promise<void> {
     return new Promise((resolve) => {
       const u = new SpeechSynthesisUtterance(text);
       if (this.voice) u.voice = this.voice;

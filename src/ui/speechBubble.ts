@@ -4,14 +4,16 @@ import { icon } from "./icons";
 import { renderMarkdown } from "./markdown";
 
 /** Globo de diálogo junto al personaje: etiqueta con el nombre, estado y la respuesta con formato. */
-export function createSpeechBubble(parent: HTMLElement) {
+export function createSpeechBubble(parent: HTMLElement, { onRead }: { onRead?: () => void } = {}) {
   const status = el("span", { class: "bubble-status" });
+  const readBtn = el("button", { class: "bubble-close bubble-read", title: "Leer en voz alta", interactive: true }, icon("volume"));
   const closeBtn = el("button", { class: "bubble-close", title: "Ocultar", interactive: true }, icon("close"));
   const head = el(
     "div",
     { class: "bubble-head" },
     el("span", { class: "bubble-name", text: "Mizu" }),
     status,
+    readBtn,
     closeBtn,
   );
   const body = el("div", { class: "bubble-body" });
@@ -22,6 +24,10 @@ export function createSpeechBubble(parent: HTMLElement) {
   closeBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     hide();
+  });
+  readBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    onRead?.();
   });
   root.addEventListener("dblclick", hide);
 
@@ -49,6 +55,15 @@ export function createSpeechBubble(parent: HTMLElement) {
   };
 
   return {
+    /** La respuesta actual en markdown (para leerla en voz alta). */
+    get text() {
+      return text;
+    },
+    /** Marca el botón de leer como activo mientras Mizu está leyendo. */
+    setReading(on: boolean) {
+      readBtn.classList.toggle("active", on);
+      readBtn.title = on ? "Dejar de leer" : "Leer en voz alta";
+    },
     /** Aviso temporal en la etiqueta de estado ("Escuchando…"); `null` lo quita y oculta el globo si está vacío. */
     hint(message: string | null, busy = true) {
       if (message === null) {

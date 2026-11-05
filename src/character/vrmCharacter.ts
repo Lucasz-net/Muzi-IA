@@ -10,7 +10,7 @@ import { emptyFrame, Gestures, IDLE_GESTURES, type ArmGesture, type GestureFrame
 import { createHeart } from "./heart";
 import { createIndicators } from "./indicators";
 import { Lipsync } from "./lipsync";
-import type { Character, Pose } from "./types";
+import type { Character, GestureLevel, Pose } from "./types";
 
 /** Expresión de fondo según el estado (se suaviza entre cambios). */
 const STATE_EXPRESSIONS: Record<CompanionState, Partial<Record<string, number>>> = {
@@ -132,10 +132,12 @@ class VrmCharacter implements Character {
   autoGestures = true;
   private idleClock = 0;
   private nextIdleGesture = 6 + Math.random() * 10;
+  /** Multiplica el tiempo entre gestos automáticos (menos = más a menudo). Ver `setGestureLevel`. */
+  private gestureFactor = 1;
   /** Brazos fijados a mano para ajustar poses en vivo (solo desarrollo). */
   private held: { left?: ArmGesture; right?: ArmGesture } | null = null;
   private readonly qBody = new THREE.Quaternion();
-  private readonly indicators = createIndicators(0.36);
+  private readonly indicators = createIndicators(0.3);
   private readonly heart = createHeart();
   private readonly heartTips: [THREE.Vector3, THREE.Vector3] = [new THREE.Vector3(), new THREE.Vector3()];
   /** Gestos de cara programados para el clip que suena (ver `clipFace`). */
@@ -152,6 +154,8 @@ class VrmCharacter implements Character {
   /** +1 si el brazo apunta hacia +X en T-pose, -1 si hacia -X (depende del modelo). */
   private readonly armDir: { left: number; right: number };
   private readonly headPos = new THREE.Vector3();
+  private readonly headCenter = new THREE.Vector3();
+  private readonly headLift = new THREE.Vector3(0, 0.08, 0);
   private readonly e = new THREE.Euler();
   private readonly qGaze = new THREE.Quaternion();
 
@@ -227,6 +231,18 @@ class VrmCharacter implements Character {
 
   gesture(name: string) {
     return this.gestures.trigger(name);
+  }
+
+  /** Con qué frecuencia lanza gestos sola en reposo: "off" los apaga; los demás espacian más o menos el reloj. */
+  /** Centro de la cabeza en el mundo: el hueso de la cabeza está en la base del cráneo, así que se sube un poco. */
+  headPosition() {
+    return this.headCenter.copy(this.headPos).add(this.headLift);
+  }
+
+  setGestureLevel(level: GestureLevel) {
+    this.autoGestures = level !== "off";
+    this.gestureFactor = { off: 1, pocos: 2.2, normal: 1, muchos: 0.45 }[level];
+    this.nextIdleGesture = Math.min(this.nextIdleGesture, Math.max(5, (14 + Math.random() * 24) * this.gestureFactor));
   }
 
   listGestures() {
@@ -415,7 +431,7 @@ class VrmCharacter implements Character {
     this.idleClock += dt;
     if (this.idleClock < this.nextIdleGesture) return;
     this.idleClock = 0;
-    this.nextIdleGesture = 14 + Math.random() * 24;
+    this.nextIdleGesture = Math.max(5, (14 + Math.random() * 24) * this.gestureFactor);
     let r = Math.random() * IDLE_GESTURES.reduce((s, g) => s + g.weight, 0);
     const pick = IDLE_GESTURES.find((g) => (r -= g.weight) < 0) ?? IDLE_GESTURES[0];
     this.gestures.trigger(pick.name);

@@ -9,6 +9,9 @@ import { createHistoryPanel } from "./ui/historyPanel";
 import { createRuleStore } from "./core/permissionRules";
 import { createPermissionPrompt } from "./ui/permissionPrompt";
 import { createRulesPanel } from "./ui/rulesPanel";
+import { createSettingsPanel } from "./ui/settingsPanel";
+import { createSettings } from "./core/settings";
+import { createNarrator } from "./voice/narrator";
 import { watchDialogSide } from "./ui/layout";
 import { createMenu } from "./ui/menu";
 import { createSpeechBubble } from "./ui/speechBubble";
@@ -29,8 +32,17 @@ machine.onChange((state) => stage.setState(state));
 // Piper (local, neuronal) con la voz de Windows como respaldo mientras se descarga el modelo la primera vez.
 const tts = createPiperTTS(createTTS());
 setTimeout(() => tts.preload().catch(() => {}), 2500);
-// "rough": si el turno tuvo tropiezos, el aviso de "terminé" suena serena y no contenta (ver `reactions`, más abajo).
-const announcer = createAnnouncer(tts, { isRough: () => reactions.rough });
+// Ajustes del usuario (panel del menú): qué lee Mizu de sus respuestas y cuántos gestos hace sola.
+const settings = createSettings();
+// Lee en voz alta las respuestas (resumen o completa, según el ajuste), más allá de los avisos.
+// "rough": si el turno tuvo tropiezos, la lectura y el "terminé" suenan serenos (ver `reactions`, más abajo).
+const narrator = createNarrator(tts, {
+  mode: () => settings.get().read,
+  isRough: () => reactions.rough,
+  enabled: () => announcer.enabled, // el botón de silenciar del menú también calla la lectura
+});
+// Los avisos ("terminé", permisos, errores). Si el narrador ya cuenta el resultado, el "terminé" sobra.
+const announcer = createAnnouncer(tts, { isRough: () => reactions.rough, suppressDone: () => narrator.willSpeak });
 
 // --- Micrófono (voz a texto con Whisper local) ---
 const stt = createWhisperSTT();
@@ -39,7 +51,13 @@ const stt = createWhisperSTT();
 const reactions = createReactions({ gesture: (name) => stage.gesture(name), say: (text, mood) => announcer.say(text, mood) });
 
 // La voz mueve la boca (lipsync) y el cursor atrae la mirada.
-tts.onSpeakingChange((speaking) => stage.setSpeaking(speaking));
+tts.onSpeakingChange((speaking) => {
+  stage.setSpeaking(speaking);
+  bubble.setReading(speaking); // el botón de leer del globo se marca mientras habla
+});
+// Gestos en reposo según el ajuste (hay que esperar a que cargue el modelo: el de relleno no los hace).
+stage.modelReady.then(() => stage.setGestureLevel(settings.get().gestures)).catch(console.error);
+settings.onChange((s) => stage.setGestureLevel(s.gestures));
 tts.onBoundary(() => stage.pulseMouth());
 cursor.onMove((x, y) => stage.setGaze(x, y)).catch(console.error);
 
@@ -74,11 +92,21 @@ stage.setView(view);
 
 // --- UI ---
 watchDialogSide(canvas);
-const bubble = createSpeechBubble(ui);
+const bubble = createSpeechBubble(ui, {
+  // Botón de leer del globo: lee la respuesta que se ve (entera, sea cual sea el ajuste) o corta la lectura.
+  onRead: () => {
+    if (tts.speaking) return narrator.stop();
+    if (!narrator.readAll(bubble.text)) {
+      bubble.hint("No hay nada que leer", false);
+      setTimeout(() => bubble.hint(null), 2000);
+    }
+  },
+});
 // Permisos recordados ("Siempre"): reglas estrechas que evitan volver a preguntar lo mismo.
 const rules = createRuleStore();
 const permissions = createPermissionPrompt(ui, rules);
 const rulesPanel = createRulesPanel(ui, rules);
+const settingsPanel = createSettingsPanel(ui, settings);
 if (import.meta.env.DEV) Object.assign(window, { mizuUi: { bubble } });
 const history = createHistoryPanel(ui, () => {
   agent.newConversation().catch(console.error);
@@ -103,6 +131,7 @@ const submit = (text: string) => {
   bubble.reset();
   machine.userSent();
   announcer.userSent();
+  narrator.userSent();
   reactions.userSent();
   setBusy(true);
   agent.send(text).catch((err) => {
@@ -176,12 +205,26 @@ const setWake = async (on: boolean) => {
     /* sin almacenamiento: vale para esta sesión */
   }
 };
-if (import.meta.env.DEV) Object.assign(window, { mizuStt: stt, mizuReact: reactions });
+if (import.meta.env.DEV) Object.assign(window, { mizuStt: stt, mizuReact: reactions, mizuNarrator: narrator, mizuSettings: settings });
 
-const closeRules = () => {
-  rulesPanel.close();
-  ui.classList.remove("history-open");
-  side.setRulesOpen(false);
+// Los paneles laterales (historial, permisos recordados, ajustes) comparten sitio: abrir uno cierra los otros.
+const panels = {
+  history: { panel: history, mark: (on: boolean) => side.setHistoryOpen(on) },
+  rules: { panel: rulesPanel, mark: (on: boolean) => side.setRulesOpen(on) },
+  settings: { panel: settingsPanel, mark: (on: boolean) => side.setSettingsOpen(on) },
+};
+const togglePanel = (name: keyof typeof panels) => {
+  const opening = !panels[name].panel.open;
+  for (const [key, p] of Object.entries(panels)) {
+    if (key !== name && p.panel.open) {
+      p.panel.close();
+      p.mark(false);
+    }
+  }
+  if (opening) panels[name].panel.toggle();
+  else panels[name].panel.close();
+  panels[name].mark(opening);
+  ui.classList.toggle("history-open", opening); // comparte sitio (y hueco del globo) con el historial
 };
 
 const side = createMenu(ui, {
@@ -210,22 +253,9 @@ const side = createMenu(ui, {
     if (stt.state === "loading" || stt.state === "transcribing") return;
     setWake(!stt.waking).catch(console.error);
   },
-  onToggleHistory: () => {
-    if (rulesPanel.open) closeRules();
-    const open = history.toggle();
-    ui.classList.toggle("history-open", open);
-    side.setHistoryOpen(open);
-  },
-  onToggleRules: () => {
-    if (history.open) {
-      history.close();
-      ui.classList.remove("history-open");
-      side.setHistoryOpen(false);
-    }
-    const open = rulesPanel.toggle();
-    ui.classList.toggle("history-open", open); // comparte sitio (y hueco del globo) con el historial
-    side.setRulesOpen(open);
-  },
+  onToggleHistory: () => togglePanel("history"),
+  onToggleRules: () => togglePanel("rules"),
+  onToggleSettings: () => togglePanel("settings"),
   onToggleVoice: () => {
     announcer.setEnabled(!announcer.enabled);
     return announcer.enabled;
@@ -251,7 +281,8 @@ agent
     // Un permiso que ya marcaste como "Siempre" se aprueba solo, sin tarjeta, gesto ni aviso.
     if (permissions.tryAutoAllow(ev)) return;
     machine.handle(ev);
-    announcer.handle(ev);
+    announcer.handle(ev); // antes que el narrador: consulta si éste va a contar el resultado para no decir "terminé" dos veces
+    narrator.handle(ev);
     reactions.handle(ev);
     bubble.handle(ev);
     history.handle(ev);

@@ -93,14 +93,34 @@ export function splitSentences(text: string): string[] {
     .replace(/[`*_#>]+/g, "")
     .replace(/\s+/g, " ")
     .trim();
-  const parts = clean.match(/[^.!?…¡¿]+[.!?…]*/g) ?? [];
+  // Se corta en el espacio tras `. ! ? …` (el punto de "main.ts" o de "3.5" no corta la frase).
+  const parts = clean.split(/(?<=[.!?…]["»)]?)\s+/u);
   const out: string[] = [];
   for (const p of parts.map((s) => s.trim()).filter((s) => /[\p{L}\p{N}]/u.test(s))) {
     // Las frases muy cortas se pegan a la anterior para que no suene entrecortado.
     if (out.length && p.length < 14) out[out.length - 1] += " " + p;
     else out.push(p);
   }
-  return out;
+  // Las frases largas se parten por una coma: la síntesis tarda en proporción a lo que dura el trozo, y así el primer
+  // sonido llega antes y ningún trozo se hace esperar. La primera frase se parte antes que las demás.
+  const split: string[] = [];
+  out.forEach((s, i) => {
+    const limit = i === 0 ? 60 : 130;
+    if (s.length <= limit) return split.push(s);
+    let commas = [...s.matchAll(/,\s+/g)].map((m) => (m.index ?? 0) + 1).filter((at) => at >= 18 && s.length - at >= 18);
+    // La primera frase sin una coma a tiempo se parte en una conjunción ("... el error | y añadí la prueba").
+    if (i === 0 && !commas.some((at) => at <= 55)) {
+      const conj = [...s.matchAll(/\s(?=(?:y|pero|que|porque|para|aunque|cuando|mientras)\s)/g)]
+        .map((m) => m.index ?? 0)
+        .filter((at) => at >= 20 && at <= 55 && s.length - at >= 15);
+      if (conj.length) commas = [conj[0]];
+    }
+    if (!commas.length) return split.push(s);
+    // Para la primera, la primera coma razonable; para el resto, la más cercana al centro.
+    const at = i === 0 ? commas[0] : commas.reduce((a, b) => (Math.abs(b - s.length / 2) < Math.abs(a - s.length / 2) ? b : a));
+    split.push(s.slice(0, at).trim(), s.slice(at).trim());
+  });
+  return split;
 }
 
 export interface PiperTTS extends TTSProvider {
@@ -109,7 +129,17 @@ export interface PiperTTS extends TTSProvider {
   /** Descarga y prepara el modelo (se llama al arrancar, en segundo plano). */
   preload(): Promise<void>;
   /** Tiempos (ms) de la última frase, para depurar: fonemizar y sintetizar cada trozo. */
-  readonly lastTimings: { phonemizeMs: number; synthMs: number[]; resumeMs: number; ctxState: string; scheduleDelayMs: number };
+  readonly lastTimings: { phonemizeMs: number; synthMs: number[] };
+}
+
+/** Un `speak`/`enqueue`: su texto se trocea en frases que se sintetizan una a una. */
+interface Job {
+  text: string;
+  opts: SpeakOptions;
+  /** Resuelve cuando termina de sonar (o se cancela). */
+  resolve: () => void;
+  /** Último trozo de audio programado de este trabajo. */
+  last?: AudioBufferSourceNode;
 }
 
 export function createPiperTTS(fallback: TTSProvider): PiperTTS {
@@ -150,31 +180,6 @@ export function createPiperTTS(fallback: TTSProvider): PiperTTS {
     return loading;
   };
 
-  // --- Reproducción ---
-  let ctx: AudioContext | null = null;
-  // Desbloqueo: el primer clic o tecla en la ventana permite reproducir audio aunque el navegador lo hubiera impedido.
-  const unlock = () => void ctx?.resume().catch(() => {});
-  window.addEventListener("pointerdown", unlock, { passive: true });
-  window.addEventListener("keydown", unlock, { passive: true });
-  let generation = 0;
-  let sources: AudioBufferSourceNode[] = [];
-  let timers: ReturnType<typeof setTimeout>[] = [];
-
-  const stopAll = () => {
-    generation++;
-    timers.forEach(clearTimeout);
-    timers = [];
-    for (const s of sources) {
-      try {
-        s.onended = null;
-        s.stop();
-      } catch {
-        /* ya había terminado */
-      }
-    }
-    sources = [];
-  };
-
   const synth = async (ids: number[], scales: [number, number, number]): Promise<Float32Array> => {
     const feeds: Record<string, ort.Tensor> = {
       input: new ort.Tensor("int64", BigInt64Array.from(ids.map(BigInt)), [1, ids.length]),
@@ -195,74 +200,142 @@ export function createPiperTTS(fallback: TTSProvider): PiperTTS {
     return [noise_scale * (m[0] / base[0]), (length_scale * (m[1] / base[1])) / (rate > 0 ? rate : 1), noise_w * (m[2] / base[2])];
   };
 
-  const lastTimings = { phonemizeMs: 0, synthMs: [] as number[], resumeMs: 0, ctxState: "", scheduleDelayMs: 0 };
+  // --- Reproducción: una cola de trabajos; el audio de cada frase se programa justo a continuación del anterior ---
+  let ctx: AudioContext | null = null;
+  // Desbloqueo: el primer clic o tecla en la ventana permite reproducir audio aunque el navegador lo hubiera impedido.
+  const unlock = () => void ctx?.resume().catch(() => {});
+  window.addEventListener("pointerdown", unlock, { passive: true });
+  window.addEventListener("keydown", unlock, { passive: true });
 
-  const speakWithPiper = async (text: string, opts: SpeakOptions) => {
-    const sentences = splitSentences(normalizeForSpeech(text));
-    if (!sentences.length) return;
-    stopAll();
-    const my = generation;
+  let generation = 0; // cada cancel() la sube: lo que estaba en marcha se descarta
+  let sources: AudioBufferSourceNode[] = [];
+  let timers: ReturnType<typeof setTimeout>[] = [];
+  let jobs: Job[] = []; // pendientes de sintetizar
+  const open = new Set<Job>(); // sin terminar de sonar
+  let pumping = false;
+  let nextStart = 0; // instante (reloj del AudioContext) en que puede empezar el siguiente trozo
+  let scheduled = 0; // trozos programados que aún no han terminado de sonar
+  const lastTimings = { phonemizeMs: 0, synthMs: [] as number[] };
+
+  const settleIfIdle = () => {
+    if (!pumping && jobs.length === 0 && scheduled === 0) setSpeaking(false);
+  };
+
+  const stopAll = () => {
+    generation++;
+    timers.forEach(clearTimeout);
+    timers = [];
+    for (const s of sources) {
+      try {
+        s.onended = null;
+        s.stop();
+      } catch {
+        /* ya había terminado */
+      }
+    }
+    sources = [];
+    scheduled = 0;
+    nextStart = 0;
+    jobs = [];
+    [...open].forEach((j) => j.resolve());
+  };
+
+  const ensureCtx = async () => {
     ctx ??= new AudioContext({ sampleRate: cfg.audio.sample_rate });
-    const tRs = performance.now();
     // Si el navegador bloquea el audio hasta que haya una interacción, no se espera en vano: habla el respaldo.
     if (ctx.state === "suspended") await Promise.race([ctx.resume(), new Promise((r) => setTimeout(r, 1200))]);
-    lastTimings.resumeMs = Math.round(performance.now() - tRs);
-    lastTimings.ctxState = ctx.state;
     if (ctx.state !== "running") throw new Error("el audio está bloqueado hasta que hagas clic en la ventana");
+    return ctx;
+  };
+
+  const playJob = async (job: Job, my: number) => {
+    const sentences = splitSentences(normalizeForSpeech(job.text));
+    if (!sentences.length) return job.resolve();
+    const audio = await ensureCtx();
     const tPh = performance.now();
     const ids = await phonemize(sentences, cfg.espeak.voice);
     lastTimings.phonemizeMs = Math.round(performance.now() - tPh);
     lastTimings.synthMs = [];
-    if (my !== generation) return; // otra frase o un cancel() llegó mientras se preparaba
-    const scales = scalesFor(opts.mood ?? "neutral", opts.rate);
-
-    let nextStart = ctx.currentTime + 0.05;
+    if (my !== generation) return;
+    const scales = scalesFor(job.opts.mood ?? "neutral", job.opts.rate);
     let charBase = 0;
-    let lastSource: AudioBufferSourceNode | null = null;
-    const finished = new Promise<void>((resolve) => {
-      const done = () => {
-        if (my === generation) setSpeaking(false);
-        resolve();
+    for (let i = 0; i < sentences.length; i++) {
+      const tSy = performance.now();
+      const samples = await synth(ids[i], scales);
+      lastTimings.synthMs.push(Math.round(performance.now() - tSy));
+      if (my !== generation) return; // un cancel() llegó mientras se sintetizaba
+      const buffer = audio.createBuffer(1, samples.length, cfg.audio.sample_rate);
+      buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
+      const src = audio.createBufferSource();
+      src.buffer = buffer;
+      src.connect(audio.destination);
+      const startAt = Math.max(nextStart, audio.currentTime + 0.02);
+      src.start(startAt);
+      nextStart = startAt + buffer.duration;
+      sources.push(src);
+      scheduled++;
+      job.last = src;
+      src.onended = () => {
+        if (my !== generation) return;
+        scheduled--;
+        sources = sources.filter((s) => s !== src);
+        if (job.last === src) job.resolve();
+        settleIfIdle();
       };
-      (async () => {
-        for (let i = 0; i < sentences.length; i++) {
-          const tSy = performance.now();
-          const samples = await synth(ids[i], scales);
-          lastTimings.synthMs.push(Math.round(performance.now() - tSy));
-          if (my !== generation) return resolve();
-          const buffer = ctx!.createBuffer(1, samples.length, cfg.audio.sample_rate);
-          buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
-          const src = ctx!.createBufferSource();
-          src.buffer = buffer;
-          src.connect(ctx!.destination);
-          const startAt = Math.max(nextStart, ctx!.currentTime + 0.02);
-          if (i === 0) lastTimings.scheduleDelayMs = Math.round((startAt - ctx!.currentTime) * 1000);
-          src.start(startAt);
-          nextStart = startAt + buffer.duration;
-          sources.push(src);
-          lastSource = src;
-          if (i === 0) timers.push(setTimeout(() => my === generation && setSpeaking(true), Math.max(0, (startAt - ctx!.currentTime) * 1000)));
+      timers.push(setTimeout(() => my === generation && setSpeaking(true), Math.max(0, (startAt - audio.currentTime) * 1000)));
 
-          // Una "palabra" por empujón de boca, repartidas a lo largo de la frase.
-          const sentence = sentences[i];
-          const words = [...sentence.matchAll(/\S+/g)];
-          const base = charBase;
-          words.forEach((w, k) => {
-            const at = startAt + (buffer.duration * k) / Math.max(words.length, 1);
-            timers.push(
-              setTimeout(() => my === generation && boundaryCbs.forEach((cb) => cb(base + (w.index ?? 0), text)), Math.max(0, (at - ctx!.currentTime) * 1000)),
-            );
-          });
-          charBase += sentence.length + 1;
-        }
-        (lastSource as AudioBufferSourceNode | null)?.addEventListener("ended", done);
-        if (!lastSource) done();
-      })().catch((e) => {
-        console.error("[piper] fallo al sintetizar:", e);
-        done();
+      // Una "palabra" por empujón de boca, repartidas a lo largo de la frase.
+      const sentence = sentences[i];
+      const base = charBase;
+      [...sentence.matchAll(/\S+/g)].forEach((w, k, all) => {
+        const at = startAt + (buffer.duration * k) / Math.max(all.length, 1);
+        timers.push(setTimeout(() => my === generation && boundaryCbs.forEach((cb) => cb(base + (w.index ?? 0), job.text)), Math.max(0, (at - audio.currentTime) * 1000)));
       });
+      charBase += sentence.length + 1;
+    }
+  };
+
+  const pump = async () => {
+    if (pumping) return;
+    pumping = true;
+    const my = generation;
+    try {
+      while (jobs.length && my === generation) {
+        const job = jobs.shift()!;
+        try {
+          await playJob(job, my);
+        } catch (e) {
+          console.error("[piper] fallo, se usa el respaldo:", e);
+          job.resolve();
+          await fallback.speak(job.text, job.opts);
+        }
+      }
+    } finally {
+      pumping = false;
+      if (jobs.length) void pump(); // llegaron trabajos nuevos tras un cancel()
+      else if (my === generation) settleIfIdle();
+    }
+  };
+
+  const addJob = (text: string, opts: SpeakOptions) =>
+    new Promise<void>((resolve) => {
+      const job: Job = {
+        text,
+        opts,
+        resolve: () => {
+          open.delete(job);
+          resolve();
+        },
+      };
+      open.add(job);
+      jobs.push(job);
+      void pump();
     });
-    await finished;
+
+  /** ¿Hay que hablar con el respaldo (Piper aún no está listo, o el respaldo sigue hablando)? */
+  const useFallback = () => {
+    if (!ready && !failed) preload().catch(() => {}); // empieza a descargar para la próxima
+    return !ready || fallback.speaking;
   };
 
   return {
@@ -278,18 +351,15 @@ export function createPiperTTS(fallback: TTSProvider): PiperTTS {
     preload,
     async speak(text, opts = {}) {
       if (!text.trim()) return;
-      if (!ready) {
-        if (!failed) preload().catch(() => {}); // empieza a descargar para la próxima
-        return fallback.speak(text, opts);
-      }
+      if (!ready) return useFallback() ? fallback.speak(text, opts) : undefined;
       fallback.cancel();
-      try {
-        await speakWithPiper(text, opts);
-      } catch (e) {
-        console.error("[piper] fallo, se usa el respaldo:", e);
-        setSpeaking(false);
-        await fallback.speak(text, opts);
-      }
+      stopAll();
+      await addJob(text, opts);
+    },
+    async enqueue(text, opts = {}) {
+      if (!text.trim()) return;
+      if (useFallback()) return fallback.enqueue ? fallback.enqueue(text, opts) : fallback.speak(text, opts);
+      await addJob(text, opts);
     },
     cancel() {
       stopAll();

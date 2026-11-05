@@ -21,6 +21,11 @@ export interface TTSProvider {
   readonly speaking: boolean;
   /** Resuelve cuando termina de hablar (o se cancela). Hablar de nuevo corta lo anterior. */
   speak(text: string, opts?: SpeakOptions): Promise<void>;
+  /**
+   * Añade texto a continuación de lo que esté sonando, sin cortarlo (para hablar mientras llega una respuesta).
+   * Resuelve cuando ese texto termina de sonar. Si el motor no lo soporta, se usa `speak`.
+   */
+  enqueue?(text: string, opts?: SpeakOptions): Promise<void>;
   cancel(): void;
   onSpeakingChange(cb: (speaking: boolean) => void): () => void;
   /** Avance del habla por palabras (si el motor lo soporta): útil para el lipsync. */

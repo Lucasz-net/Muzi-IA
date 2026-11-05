@@ -1,3 +1,7 @@
+// El runtime de onnxruntime que usa transformers.js, empaquetado con la app: por defecto lo pediría a una CDN y sin
+// internet Whisper no arrancaría ni teniendo el modelo en caché.
+import ortAsyncifyWasm from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url";
+import ortAsyncifyMjs from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url";
 import type { ListenState, STTProvider } from "./stt";
 
 /**
@@ -322,6 +326,7 @@ export function createWhisperSTT(): STTProvider {
     loading ??= (async () => {
       const { pipeline, env } = await import("@huggingface/transformers");
       env.allowLocalModels = false;
+      env.backends.onnx.wasm!.wasmPaths = { mjs: ortAsyncifyMjs, wasm: ortAsyncifyWasm };
       // Sin WebGPU, con aislamiento de origen cruzado (ver vite.config.ts) onnxruntime-web usa varios hilos de CPU.
       if (self.crossOriginIsolated) env.backends.onnx.wasm!.numThreads = Math.max(2, Math.min(6, Math.floor(navigator.hardwareConcurrency / 2)));
       let lastPct = -1;

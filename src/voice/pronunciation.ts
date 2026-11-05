@@ -91,12 +91,21 @@ const SYMBOLS: [RegExp, string][] = [
   [/\bcs:go\b/gi, "ce ese guó"],
 ];
 
+/** Extensiones de archivo: `main.ts` se dice "main punto te ese". */
+const EXTENSIONS: Record<string, string> = {
+  ts: "te ese", tsx: "te ese equis", js: "jota ese", jsx: "jota ese equis", mjs: "eme jota ese", md: "eme de", rs: "erre ese",
+  py: "pi i", cs: "ce ese", sh: "ese hache", toml: "toml", yml: "yaml", yaml: "yaml", json: "yéison", html: "hache te eme ele",
+  css: "ce ese ese", exe: "exe", txt: "texto", png: "pe ene ge", jpg: "jota pe ge", pdf: "pe de efe", vrm: "uve erre eme", fbx: "efe be equis",
+};
+const EXT_RE = new RegExp(`(?<=[\\p{L}\\p{N}_-])\\.(${Object.keys(EXTENSIONS).join("|")})(?![\\p{L}\\p{N}])`, "giu");
+
 const WORD = /[\p{L}\p{N}][\p{L}\p{N}:'-]*/gu;
 
 /** Texto -> texto para la voz: palabras en inglés y siglas escritas como se pronuncian. */
 export function normalizeForSpeech(text: string): string {
   let out = text;
   for (const [re, to] of SYMBOLS) out = out.replace(re, to);
+  out = out.replace(EXT_RE, (_m, ext: string) => ` punto ${EXTENSIONS[ext.toLowerCase()]}`);
   return out.replace(WORD, (token) => {
     const known = WORDS[token.toLowerCase()];
     if (known) return known;

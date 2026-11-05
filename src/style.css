@@ -1,19 +1,43 @@
+/* =====================================================================================================
+   Mizu-IA: interfaz. Estilo discreto y moderno: superficies violeta grafito, acento lila (en armonía con el pelo y la
+   chaqueta del personaje), bordes finos, sombras suaves, botones "fantasma" y animaciones cortas.
+   ===================================================================================================== */
 :root {
-  --glass: rgba(24, 28, 42, 0.9);
-  --glass-solid: rgba(24, 28, 42, 0.97);
-  --glass-border: rgba(255, 255, 255, 0.13);
-  --text: #eef1f7;
-  --muted: #9aa4b8;
-  --accent: #7cc4ff;
-  --ok: #6ee7a0;
-  --danger: #ff7a7a;
+  /* Superficies */
+  --surface: rgba(25, 22, 38, 0.93);
+  --surface-2: rgba(33, 29, 50, 0.95);
+  --surface-solid: rgba(22, 19, 33, 0.98);
+  --inset: rgba(10, 8, 20, 0.55);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(189, 172, 255, 0.26);
+  /* Texto y colores */
+  --text: #ecebf5;
+  --text-dim: #cfcce0;
+  --muted: #9a97ae;
+  --accent: #bba9ff;
+  --accent-soft: rgba(187, 169, 255, 0.16);
+  --accent-ink: #1c1530;
+  --ok: #82ddb0;
+  --danger: #ff9494;
+  --shadow: 0 12px 32px rgba(8, 6, 20, 0.5), 0 2px 8px rgba(8, 6, 20, 0.35);
+  --shadow-sm: 0 6px 18px rgba(8, 6, 20, 0.4);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* Ventana simétrica (1180 px): [franja de diálogo][personaje][franja de diálogo].
      --zone debe coincidir con SIDE_ZONE en src-tauri/src/window.rs. */
   --zone: 320px;
   --pad: 12px;
   --menu-gap: 112px; /* distancia del menú al centro del personaje */
-  --col-w: calc(var(--zone) - var(--pad) - 16px); /* ancho de diálogo/historial/permisos */
+  --col-w: calc(var(--zone) - var(--pad) - 16px); /* ancho de los paneles laterales */
+
+  /* Posición de la cabeza en la ventana (px): la publica la escena en cada fotograma (ver scene.ts). */
+  --head-x: 590px;
+  --head-y: 270px;
+  --head-r: 50px;
+  /* El globo, las peticiones de permiso y el chat se pegan al personaje: su borde interior queda a esta distancia del centro. */
+  --dock-gap: calc(var(--head-r) + 44px);
+  --bubble-w: 330px;
+  --bubble-top: max(var(--pad), calc(var(--head-y) - 40px));
 }
 
 html,
@@ -24,9 +48,11 @@ body {
   background: transparent;
   overflow: hidden;
   user-select: none;
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   font-size: 13px;
+  letter-spacing: 0.005em;
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
 }
 
 /* El personaje se renderiza en la franja central. */
@@ -52,6 +78,17 @@ body {
   position: fixed;
   inset: 0;
   pointer-events: none;
+  /* Hueco que el globo deja libre en la base de la ventana para el chat y las peticiones de permiso. */
+  --reserve: 20px;
+}
+#ui.chat-open {
+  --reserve: 76px;
+}
+#ui:has(.perm-card) {
+  --reserve: 178px;
+}
+#ui.chat-open:has(.perm-card) {
+  --reserve: 232px;
 }
 .interactive {
   pointer-events: auto;
@@ -69,79 +106,124 @@ svg {
   display: block;
 }
 
-/* --- Columna del lado del diálogo: por defecto a la izquierda del personaje --- */
-.bubble,
-.permissions,
+/* Barras de desplazamiento finas y discretas. */
+.bubble-body,
+.history-list,
+.perm-detail {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+/* =====================================================================================================
+   Paneles laterales (historial, permisos recordados, ajustes): columna en el borde exterior de la ventana
+   ===================================================================================================== */
 .history {
   position: absolute;
   left: var(--pad);
   width: var(--col-w);
   box-sizing: border-box;
 }
-[data-dialog="right"] .bubble,
-[data-dialog="right"] .permissions,
 [data-dialog="right"] .history {
   left: auto;
   right: var(--pad);
 }
 
-/* --- Globo de diálogo --- */
+/* =====================================================================================================
+   Globo de diálogo: pegado al personaje, junto a su cabeza, con la colita apuntándole
+   ===================================================================================================== */
 .bubble {
-  top: 64px;
-  max-height: calc(100% - 64px - 90px);
+  position: absolute;
+  box-sizing: border-box;
+  /* Borde interior a --dock-gap del centro de la cabeza; crece hacia el borde exterior de la ventana. */
+  right: calc(100% - var(--head-x) + var(--dock-gap));
+  top: var(--bubble-top);
+  /* Se ajusta a su contenido (un "Pensando." no necesita 330 px) hasta un máximo. */
+  width: max-content;
+  min-width: 150px;
+  min-height: 42px;
+  max-width: min(var(--bubble-w), calc(var(--head-x) - var(--dock-gap) - var(--pad)));
+  max-height: calc(100% - var(--bubble-top) - var(--reserve));
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 14px 12px;
-  background: linear-gradient(180deg, rgba(36, 42, 62, 0.95), rgba(24, 28, 42, 0.95));
-  border: 1px solid var(--glass-border);
-  border-radius: 18px;
-  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
-  transform-origin: 100% 30px;
+  gap: 5px;
+  padding: 9px 13px 11px;
+  background: linear-gradient(165deg, rgba(41, 36, 64, 0.95), rgba(26, 23, 40, 0.95));
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  transform-origin: 100% 40px;
 }
 [data-dialog="right"] .bubble {
-  transform-origin: 0 30px;
+  right: auto;
+  left: calc(var(--head-x) + var(--dock-gap));
+  max-width: min(var(--bubble-w), calc(100% - var(--head-x) - var(--dock-gap) - var(--pad)));
+  transform-origin: 0 40px;
 }
 .bubble.pop {
-  animation: pop 0.18s ease-out;
+  animation: bubble-in 0.24s var(--ease);
 }
-@keyframes pop {
+@keyframes bubble-in {
   from {
     opacity: 0;
-    transform: scale(0.94) translateY(4px);
+    transform: translateX(8px) scale(0.97);
   }
 }
-/* Colita que apunta al personaje. */
+[data-dialog="right"] .bubble.pop {
+  animation-name: bubble-in-right;
+}
+@keyframes bubble-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(-8px) scale(0.97);
+  }
+}
+/* Colita: un rombo girado que apunta al centro de la cabeza (se mantiene dentro del globo). */
 .bubble::after {
   content: "";
   position: absolute;
-  top: 24px;
-  right: -9px;
-  border: 9px solid transparent;
-  border-right: 0;
-  border-left-color: rgba(30, 35, 52, 0.95);
+  top: clamp(14px, calc(var(--head-y) - var(--bubble-top) - 6px), calc(100% - 26px));
+  right: -7px;
+  width: 12px;
+  height: 12px;
+  background: rgb(36, 32, 55);
+  border-top: 1px solid var(--line-strong);
+  border-right: 1px solid var(--line-strong);
+  border-radius: 0 3px 0 0;
+  transform: rotate(45deg);
 }
 [data-dialog="right"] .bubble::after {
   right: auto;
-  left: -9px;
-  border-right: 9px solid rgba(30, 35, 52, 0.95);
-  border-left: 0;
+  left: -7px;
+  border: none;
+  border-bottom: 1px solid var(--line-strong);
+  border-left: 1px solid var(--line-strong);
+  border-radius: 0 0 0 3px;
 }
 .bubble-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 20px;
+  gap: 7px;
+  min-height: 18px;
 }
+/* El nombre: un punto lila con un halo suave y el texto en pequeño; discreto, no una etiqueta llamativa. */
 .bubble-name {
   flex: none;
-  padding: 2px 9px;
-  border-radius: 999px;
-  background: rgba(124, 196, 255, 0.18);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--accent);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.bubble-name::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px 1px rgba(187, 169, 255, 0.6);
 }
 .bubble-status {
   flex: 1;
@@ -176,12 +258,22 @@ svg {
     content: "...";
   }
 }
+.bubble-read {
+  margin-left: auto;
+}
+.bubble-read + .bubble-close {
+  margin-left: 0;
+}
+.bubble-read.active {
+  opacity: 1;
+  color: var(--accent);
+}
 .bubble-close {
   flex: none;
   margin-left: auto;
-  width: 20px;
-  height: 20px;
-  padding: 3px;
+  width: 22px;
+  height: 22px;
+  padding: 4px;
   box-sizing: border-box;
   display: grid;
   place-items: center;
@@ -190,47 +282,56 @@ svg {
   background: transparent;
   color: var(--muted);
   opacity: 0;
-  transition: opacity 0.12s;
+  transition:
+    opacity 0.15s,
+    background 0.15s,
+    color 0.15s;
 }
 .bubble:hover .bubble-close {
   opacity: 1;
 }
 .bubble-close:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
   color: var(--text);
 }
 .bubble-body {
   overflow-y: auto;
-  line-height: 1.5;
-  font-size: 13.5px;
+  line-height: 1.55;
+  font-size: 13px;
+  color: var(--text-dim);
   user-select: text;
   word-break: break-word;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
 }
 .bubble-body.empty {
   display: none;
 }
 .bubble-body strong {
   color: #fff;
+  font-weight: 600;
+}
+.bubble-body em {
+  color: var(--text);
 }
 .bubble-body code {
   padding: 1px 5px;
   border-radius: 5px;
-  background: rgba(255, 255, 255, 0.1);
-  font-family: Consolas, monospace;
-  font-size: 12px;
+  background: var(--accent-soft);
+  color: #e6defe;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
 }
 .bubble-body pre {
   margin: 6px 0;
   padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.35);
+  border-radius: 9px;
+  background: var(--inset);
+  border: 1px solid var(--line);
   overflow-x: auto;
 }
 .bubble-body pre code {
   padding: 0;
   background: none;
+  color: var(--text-dim);
   white-space: pre;
 }
 .md-gap {
@@ -243,7 +344,7 @@ svg {
 }
 .md-li {
   display: flex;
-  gap: 6px;
+  gap: 7px;
 }
 .md-mark {
   flex: none;
@@ -254,89 +355,240 @@ svg {
   visibility: hidden;
 }
 
-/* --- Permisos --- */
+/* =====================================================================================================
+   Permisos: tarjetas pegadas al personaje, justo encima del chat
+   ===================================================================================================== */
 .permissions {
+  position: absolute;
+  box-sizing: border-box;
+  right: calc(100% - var(--head-x) + var(--dock-gap));
+  width: min(var(--bubble-w), calc(var(--head-x) - var(--dock-gap) - var(--pad)));
   bottom: var(--pad);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
+[data-dialog="right"] .permissions {
+  right: auto;
+  left: calc(var(--head-x) + var(--dock-gap));
+  width: min(var(--bubble-w), calc(100% - var(--head-x) - var(--dock-gap) - var(--pad)));
+}
 .chat-open .permissions {
-  bottom: 66px;
+  bottom: 64px;
 }
 .perm-card {
-  padding: 10px 12px;
-  background: var(--glass-solid);
-  border: 1px solid var(--accent);
+  padding: 10px 12px 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--accent);
   border-radius: 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-sm);
+  animation: bubble-in 0.22s var(--ease);
 }
 .perm-title {
   font-weight: 600;
-  margin-bottom: 4px;
+  font-size: 12.5px;
+  margin-bottom: 6px;
 }
 .perm-detail {
-  color: var(--text);
-  font-family: Consolas, monospace;
-  font-size: 11.5px;
-  max-height: 70px;
+  color: var(--text-dim);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+  max-height: 72px;
   overflow-y: auto;
   word-break: break-all;
   white-space: pre-wrap;
-  margin-bottom: 4px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--inset);
+  user-select: text;
 }
 .perm-note {
+  margin-top: 5px;
   color: var(--muted);
-  font-family: Consolas, monospace;
-  font-size: 11px;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10.5px;
   white-space: pre-wrap;
   word-break: break-all;
-  margin-bottom: 8px;
 }
 .perm-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 6px;
-}
-.btn {
-  padding: 5px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, 0.08);
-}
-.btn.accept {
-  background: var(--ok);
-  border-color: var(--ok);
-  color: #0b2416;
-  font-weight: 600;
-}
-.btn.always {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.btn.always:hover {
-  background: var(--accent);
-  color: #08202f;
+  gap: 6px;
+  margin-top: 9px;
 }
 .perm-rule {
-  margin-top: 6px;
+  margin-top: 7px;
   color: var(--muted);
   font-size: 10.5px;
   word-break: break-all;
 }
+.btn {
+  padding: 5px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.btn.accept {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #0b2418;
+  font-weight: 600;
+}
+.btn.accept:hover {
+  background: #9be8c0;
+}
+.btn.always {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: var(--accent);
+}
+.btn.always:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.btn.reject {
+  color: var(--text-dim);
+}
+.btn.reject:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: rgba(255, 148, 148, 0.08);
+}
+
+/* =====================================================================================================
+   Paneles: historial, permisos recordados y ajustes (misma columna, se excluyen entre sí)
+   ===================================================================================================== */
+.history {
+  top: var(--pad);
+  bottom: var(--pad);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-solid);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  animation: panel-in 0.2s var(--ease);
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.chat-open .history {
+  bottom: 64px;
+}
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 14px 9px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 11.5px;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 0;
+  opacity: 0.9;
+}
+.link-btn:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  user-select: text;
+}
+.entry {
+  white-space: pre-wrap;
+  line-height: 1.45;
+  word-break: break-word;
+  color: var(--text-dim);
+}
+.entry.user {
+  align-self: flex-end;
+  max-width: 88%;
+  padding: 6px 11px;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--accent-soft);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+}
+.entry.tool {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--muted);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+}
+.entry.tool::before,
+.entry.tool::after {
+  content: "";
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: 0.7;
+}
+.entry.tool::after {
+  order: 2;
+  margin-left: auto;
+  background: transparent;
+}
+.entry.tool.ok::after {
+  background: var(--ok);
+  opacity: 1;
+}
+.entry.tool.failed::after {
+  background: var(--danger);
+  opacity: 1;
+}
+.entry.system {
+  color: var(--accent);
+  font-size: 11.5px;
+}
+.entry.error {
+  color: var(--danger);
+}
+/* Permisos recordados */
 .rule-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--line);
 }
 .rule-label {
   flex: 1;
-  font-family: Consolas, monospace;
-  font-size: 11.5px;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+  color: var(--text-dim);
   word-break: break-all;
 }
 .rule-del {
@@ -345,18 +597,57 @@ svg {
   flex: none;
 }
 .rule-del svg {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
 }
 .rule-empty {
   color: var(--muted);
 }
-.btn.reject:hover {
-  border-color: var(--danger);
-  color: var(--danger);
+/* Ajustes */
+.setting {
+  padding: 11px 2px 13px;
+  border-bottom: 1px solid var(--line);
+}
+.setting-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.setting-hint {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.seg {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.seg-btn {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  color: var(--text-dim);
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.seg-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+.seg-btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
 }
 
-/* --- Menú desplegable (en el borde exterior del personaje, opuesto al diálogo) --- */
+/* =====================================================================================================
+   Menú desplegable (en el borde exterior del personaje, opuesto al diálogo)
+   ===================================================================================================== */
 /* Junto al personaje: el centro de la ventana es el centro del personaje. */
 .menu {
   position: absolute;
@@ -378,74 +669,103 @@ svg {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(20, 24, 36, 0.62);
-  color: #e8ecf6;
+  border: 1px solid var(--line);
+  background: rgba(24, 21, 36, 0.78);
+  color: var(--text-dim);
+  box-shadow: 0 2px 8px rgba(8, 6, 20, 0.3);
   transition:
-    background 0.12s,
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
     opacity 0.15s,
     transform 0.15s,
     visibility 0.15s;
 }
 .icon-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
 }
 .icon-btn:hover {
-  background: rgba(40, 48, 72, 0.9);
+  background: rgba(46, 40, 70, 0.95);
+  border-color: var(--line-strong);
+  color: #fff;
 }
 .icon-btn.active {
-  background: var(--accent);
+  background: var(--accent-soft);
   border-color: var(--accent);
-  color: #08202f;
+  color: var(--accent);
 }
 /* El punto plegado: casi invisible hasta que se acerca el ratón. */
 .menu-trigger {
-  width: 28px;
-  height: 28px;
-  opacity: 0.4;
-  background: rgba(20, 24, 36, 0.4);
+  width: 26px;
+  height: 26px;
+  opacity: 0.35;
+  background: rgba(24, 21, 36, 0.5);
+  box-shadow: none;
   cursor: grab;
 }
 .menu-trigger svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
 }
 .menu-trigger:hover,
 .menu.open .menu-trigger {
   opacity: 1;
 }
 .icon-btn.mic.listening {
-  background: var(--danger);
+  background: rgba(255, 148, 148, 0.22);
   border-color: var(--danger);
-  color: #2a0a0a;
+  color: var(--danger);
   animation: mic-pulse 1.1s ease-in-out infinite;
 }
 .icon-btn.mic.standby {
-  box-shadow: 0 0 0 2px rgba(120, 200, 255, 0.55);
+  box-shadow: 0 0 0 2px rgba(187, 169, 255, 0.45);
 }
 .icon-btn.mic.working {
   opacity: 0.6;
   animation: mic-wait 1.2s ease-in-out infinite;
 }
 @keyframes mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 90, 90, 0.55); }
-  50% { box-shadow: 0 0 0 9px rgba(255, 90, 90, 0); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 148, 148, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 9px rgba(255, 148, 148, 0);
+  }
 }
 @keyframes mic-wait {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 0.9; }
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
 }
 .icon-btn.stop {
-  background: var(--danger);
+  background: rgba(255, 148, 148, 0.2);
   border-color: var(--danger);
+  color: var(--danger);
+}
+.icon-btn.stop:hover {
+  background: var(--danger);
   color: #2a0a0a;
 }
 .menu-items {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
+}
+/* El menú tiene muchos botones: un poco más compactos para que quepan en la ventana. */
+.menu-items .icon-btn {
+  width: 30px;
+  height: 30px;
+}
+.menu-items .icon-btn svg {
+  width: 16px;
+  height: 16px;
 }
 .menu-items > * {
   opacity: 0;
@@ -462,42 +782,54 @@ svg {
   visibility: visible;
 }
 .menu-sep {
-  width: 18px;
+  width: 16px;
   height: 1px;
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--line-strong);
 }
 .icon-btn.quit:hover {
-  background: var(--danger);
+  background: rgba(255, 148, 148, 0.2);
   border-color: var(--danger);
-  color: #2a0a0a;
+  color: var(--danger);
 }
 
-/* --- Barra de chat (oculta por defecto) --- */
+/* =====================================================================================================
+   Barra de chat (oculta por defecto): una píldora pegada al personaje, en la base de la ventana
+   ===================================================================================================== */
 .bar {
   position: absolute;
-  left: var(--pad);
-  bottom: var(--pad);
-  width: 460px;
   box-sizing: border-box;
+  right: calc(100% - var(--head-x) + var(--dock-gap));
+  bottom: var(--pad);
+  width: min(380px, calc(var(--head-x) - var(--dock-gap) - var(--pad)));
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  padding: 6px 6px 6px 14px;
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  border-radius: 20px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  padding: 5px 5px 5px 15px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 [data-dialog="right"] .bar {
-  left: auto;
-  right: var(--pad);
+  right: auto;
+  left: calc(var(--head-x) + var(--dock-gap));
+  width: min(380px, calc(100% - var(--head-x) - var(--dock-gap) - var(--pad)));
+}
+.bar:focus-within {
+  border-color: var(--line-strong);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 3px rgba(187, 169, 255, 0.12);
 }
 .field {
   flex: 1;
   resize: none;
   min-height: 20px;
   max-height: 96px;
-  padding: 7px 4px;
+  padding: 7px 2px;
   font: inherit;
   color: var(--text);
   background: transparent;
@@ -509,8 +841,8 @@ svg {
   color: var(--muted);
 }
 .send-btn {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   flex: none;
   padding: 0;
   display: grid;
@@ -518,102 +850,22 @@ svg {
   border: none;
   border-radius: 50%;
   background: var(--accent);
-  color: #08202f;
+  color: var(--accent-ink);
+  transition:
+    background 0.15s,
+    transform 0.15s;
+}
+.send-btn:hover {
+  background: #cfc1ff;
+}
+.send-btn:active {
+  transform: scale(0.94);
 }
 .send-btn svg {
-  width: 17px;
-  height: 17px;
+  width: 15px;
+  height: 15px;
 }
 .send-btn.stop {
   background: var(--danger);
   color: #2a0a0a;
-}
-
-/* --- Historial (misma columna que el diálogo) --- */
-.history {
-  top: var(--pad);
-  bottom: var(--pad);
-  display: flex;
-  flex-direction: column;
-  background: var(--glass-solid);
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-  overflow: hidden;
-}
-.chat-open .history {
-  bottom: 66px;
-}
-.history-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--glass-border);
-  font-weight: 600;
-}
-.link-btn {
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-size: 12px;
-  padding: 0;
-}
-.history-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  user-select: text;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
-}
-.entry {
-  white-space: pre-wrap;
-  line-height: 1.4;
-  word-break: break-word;
-}
-.entry.user {
-  align-self: flex-end;
-  max-width: 85%;
-  padding: 5px 10px;
-  border-radius: 10px;
-  background: rgba(124, 196, 255, 0.22);
-}
-.entry.tool {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  color: var(--muted);
-  font-family: Consolas, monospace;
-  font-size: 11.5px;
-}
-.entry.tool::before,
-.entry.tool::after {
-  content: "";
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--muted);
-}
-.entry.tool::after {
-  order: 2;
-  margin-left: auto;
-  background: transparent;
-}
-.entry.tool.ok::after {
-  background: var(--ok);
-}
-.entry.tool.failed::after {
-  background: var(--danger);
-}
-.entry.system {
-  color: var(--accent);
-  font-size: 11.5px;
-}
-.entry.error {
-  color: var(--danger);
 }
