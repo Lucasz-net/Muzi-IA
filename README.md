@@ -98,7 +98,10 @@ El icono de la **oreja** deja el micrófono abierto y atento. Solo se hace caso 
 - Mientras habla no escucha, para no oírse a sí misma.
 - El estado se recuerda: si estaba encendida al cerrar, se retoma al arrancar.
 - "Mizu, para" funciona aunque Whisper lo escriba pegado ("Mezupara").
-- Whisper escribe el nombre de muchas formas (Misu, Mizo, Mezmo...): `WAKE_WORD` en `whisperProvider.ts` acepta una familia de grafías, y una frase de una sola palabra parecida a "Mizu" también cuenta. En desarrollo, `mizuStt.heard` lista lo último que oyó y si lo aceptó.
+- **Cómo se reconoce el nombre.** Con voz real Whisper escribe "Mizu" de formas muy variadas ("mis su", "me sub", "miso", "Mezmo", "Mezbo"...). Se ataja de dos maneras:
+  - *Ayuda de vocabulario:* antes de transcribir se le pasa a Whisper un texto de contexto con el nombre bien escrito ("Hola, Mizu. ¿Qué tal, Mizu?…"), que es el "prompt" de Whisper, y tiende a escribirlo igual. transformers.js no lo expone, así que se llama al modelo directamente (`transcribePrompted`); si falla una vez se desactiva y se usa el método normal. El texto no lleva órdenes y se descartan los ecos largos del contexto, para que con ruido nunca parezca un encargo.
+  - *Formas aceptadas* (`voice/wakeWord.ts`): una palabra (Mizu, Misu, Miso, Mezmo...), el nombre partido en dos palabras cortas ("mis su", "mi zu", "me sub"), un saludo opcional delante ("hola Mizu", "oye Mizu"), pegado a "para" ("Mezupara") y, si la frase es solo una palabra parecida, se toma por el nombre. Frases corrientes como "mi sobrino", "me suena", "mi suegra" o "mismo" no activan nada.
+- En desarrollo, `mizuStt.heard` lista lo último que oyó y si lo aceptó, y `mizuStt.debug` guarda el audio de las últimas frases (solo en memoria) para comparar ajustes con tu voz real: `await mizuStt.debug.run(mizuStt.debug.recent.at(-1), true | false)` transcribe con o sin la ayuda de vocabulario.
 - Las órdenes que abren programas pasan por el flujo de permisos de siempre (Aceptar / Rechazar).
 - Retardo: ~1 s entre que terminas de hablar y que empieza a trabajar (0,9 s de silencio + transcripción en la GPU).
 
@@ -144,10 +147,32 @@ Mizu no solo da avisos: **lee sus respuestas en voz alta** (`voice/narrator.ts`)
 #### Ajustes
 
 El panel de ajustes (`ui/settingsPanel.ts`, valores en `core/settings.ts`, guardados en `localStorage["mizu.settings"]`) tiene:
+- **Forma de hablar** (casual / detallada) y **Control del PC** (activado / desactivado): se guardan en el backend (`config.json`, campos `persona` y `desktop`), no en `localStorage`; ver abajo.
 - **Lectura de respuestas:** solo avisos / resumen / completa.
 - **Gestos en reposo:** ninguno / pocos (cada ~30-80 s) / normal (14-38 s) / muchos (5-17 s). Controla con qué frecuencia hace guiños, estiramientos o el corazón coreano cuando no hay nada que hacer.
 
 Los tres paneles laterales (historial, permisos recordados y ajustes) comparten sitio: abrir uno cierra los otros.
+
+#### Forma de hablar (personalidad)
+
+Por defecto Mizu **no responde como Claude Code**: charla de forma casual, con frases cortas (de una a cuatro), sin tecnicismos, sin listas ni código, y cuenta el resultado de lo que hace en una frase ("Listo, ya abrí Steam") en vez de narrar cada paso. Así además suena mucho mejor al leerla en voz alta.
+
+- Se consigue añadiendo su personalidad al prompt de Claude Code con `--append-system-prompt-file` (no se sustituye el prompt original, así que las herramientas y los permisos funcionan igual). El texto está en `src-tauri/persona/mizu.txt` y se incluye en el ejecutable (`include_str!`); en cada arranque del CLI se escribe en un archivo temporal y se pasa su ruta, porque en Windows `claude` es un `.cmd` y un texto largo como argumento se rompería.
+- Si le pides detalles técnicos, que te explique algo a fondo o que te muestre código, entonces sí se extiende y usa formato.
+- Ajustes → **Forma de hablar**: *Casual* (por defecto) o *Detallada* (sin la personalidad: el estilo normal de Claude Code). Cambiarlo reinicia el proceso del CLI pero **sigue la misma conversación** (`--resume`); eso sí, el estilo ya usado en esa conversación pesa, así que para notar del todo el cambio conviene empezar una conversación nueva. No se puede cambiar con una tarea en marcha.
+- Para cambiarle el carácter, edita `src-tauri/persona/mizu.txt` (se aplica al recompilar y al siguiente arranque del CLI).
+
+#### Control del PC (ratón, teclado y pantalla)
+
+Además de las herramientas de Claude Code (archivos, comandos de PowerShell, web), Mizu puede **hacer clic, escribir, pulsar teclas, cambiar de ventana y ver la pantalla** (`Ajustes → Control del PC`, activado por defecto). Sirve para lo que un comando no alcanza: manejar un programa que no tiene línea de comandos, cerrar un diálogo, subir el volumen dentro de una aplicación…
+
+- Es un **servidor MCP propio** (`src-tauri/src/mcp_desktop.rs`): el mismo ejecutable de la app con `--mcp-desktop`, que Claude Code lanza por stdio (`--mcp-config`, ver `claude_code.rs`). Usa los crates `enigo` (ratón y teclado), `xcap` (capturas) y `image`; no hay nada que instalar aparte.
+- **Por qué no es un script de PowerShell:** Windows Defender (AMSI) bloquea como malintencionado cualquier script que inyecte teclas y ratón y haga capturas, aunque sea el tuyo. Un programa compilado no tiene ese problema y además responde al instante (7 ms frente a ~1 s).
+- Herramientas: `screenshot`, `screen_info`, `cursor_position`, `move`, `click`, `drag`, `scroll`, `type_text`, `key`, `list_windows`, `focus_window`, `wait`. Las coordenadas del ratón son las de la última captura (el servidor las convierte a píxeles reales), así que antes de hacer clic Mizu hace una captura.
+- **Cada acción pide permiso** con una tarjeta en lenguaje llano ("¿Hacer clic? En (640, 360) de la pantalla", "¿Escribir este texto?", "¿Ver tu pantalla?"). **«Siempre» solo se ofrece para lo que solo mira** (captura, ventanas, tamaño de pantalla, posición del ratón); hacer clic, escribir o pulsar teclas se pregunta siempre.
+- No ve la pantalla "todo el rato": solo hace una captura cuando la tarea lo necesita y tú lo apruebas. Claude Code no admite vídeo en tiempo real, y cada captura gasta cuota del plan.
+- Con el ajuste desactivado no se registra el servidor. Al cambiarlo se reinicia el proceso del CLI pero se sigue la misma conversación.
+- Prueba sin Claude: `mizu-ia --mcp-desktop` habla JSON-RPC por stdin/stdout (`initialize`, `tools/list`, `tools/call`).
 
 #### Ánimo automático
 
