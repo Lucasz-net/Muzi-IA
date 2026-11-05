@@ -34,7 +34,7 @@ mizuSay("Hola")             // prueba la voz
 ## Uso
 
 - El menú está plegado: solo se ve un punto discreto (⋮) junto al personaje. Púlsalo para desplegar los iconos (se pliega solo a los 5 s) o arrástralo para mover la ventana. También puedes arrastrar desde el personaje.
-- Iconos del menú: chat, carpeta de trabajo (por defecto tu carpeta personal; cambiarla inicia una conversación nueva), historial (con "Nueva conversación"), voz, **zoom** (alterna plano medio / cuerpo completo; se recuerda entre sesiones) y cerrar. Mientras hay una tarea aparece aparte un botón rojo para detenerla.
+- Iconos del menú: chat, carpeta de trabajo (por defecto tu carpeta personal; cambiarla inicia una conversación nueva), historial (con "Nueva conversación"), **micrófono**, voz, **zoom** (alterna plano medio / cuerpo completo; se recuerda entre sesiones) y cerrar. Mientras hay una tarea aparece aparte un botón rojo para detenerla.
 - El chat está oculto: ábrelo con el icono de chat. Enter envía (Shift+Enter = salto de línea), Escape lo cierra.
 - La respuesta sale en un globo junto al personaje, con formato (negrita, código, listas). Siempre aparece hacia el centro de la pantalla: si arrastras el personaje al borde izquierdo, el globo pasa a la derecha, y viceversa.
 - Cuando Claude necesita permiso aparece una tarjeta con **Aceptar / Rechazar**.
@@ -66,11 +66,80 @@ Flujo: el CLI emite JSON por stdout → el adaptador lo convierte en `AgentEvent
 
 ### Permisos
 
+Cada petición muestra una tarjeta con **Rechazar / Siempre / Aceptar**. «Siempre» acepta y recuerda una regla **estrecha** para no volver a preguntar lo mismo (`core/permissionRules.ts`):
+
+- Comandos: el comienzo del comando, el programa y su primer argumento (`git status`, `npm test`, `Start-Process steam://rungameid/730`). Solo vale para comandos **simples**: si encadenan algo (`;`, `&&`, `||`, `|`, redirecciones, subcomandos) se pregunta siempre, así que la regla de `git status` no aprueba `git status && rm -rf …`.
+- Edit/Write: archivos dentro de esa carpeta. WebFetch: ese dominio. WebSearch: cualquiera.
+- **Nunca ofrece «Siempre»** para comandos destructivos o de sistema (`rm`, `del`, `Remove-Item`, `format`, `shutdown`, `sudo`, `reg`, `git push --force`, `git reset --hard`, `iex`, `Set-ExecutionPolicy`...), ni para rutas del sistema (Windows, Program Files, `.ssh`...). Esos se preguntan cada vez.
+- Un permiso recordado se aprueba solo, sin tarjeta, gesto ni aviso. Se guardan en `localStorage["mizu.permRules"]`.
+- El icono del **escudo** del menú lista lo recordado: se puede olvidar uno a uno o todo («Olvidar todos»).
+
 Se lanza el CLI con `--permission-prompt-tool stdio`: el CLI manda un `control_request` (`can_use_tool`) y la app responde con un `control_response` (allow con `updatedInput`, o deny con mensaje). No hace falta ningún servidor MCP.
+
+### Micrófono (voz a texto)
+
+El icono del micrófono del menú **escucha**: lo pulsas, hablas y, cuando dejas de hablar (~1 s de silencio), transcribe y envía el mensaje al agente como si lo hubieras escrito. Pulsarlo de nuevo mientras escucha corta la grabación en el acto. Mientras escucha, el icono pulsa en rojo y el globo dice "Escuchando…".
+
+- Motor: **Whisper base** (multilingüe) ejecutándose dentro de la propia app con transformers.js (`src/voice/whisperProvider.ts`, interfaz en `stt.ts`). Sin servidor y sin mandar tu audio a nadie. La primera vez descarga el modelo (~139 MB con WebGPU, ~73 MB en CPU; el globo muestra el avance) y queda en la caché de la ventana.
+- Corre en la **tarjeta gráfica (WebGPU)**, unas 3 veces más rápido que la CPU: la transcripción de una frase es casi instantánea y la orden sale justo al terminar el silencio. Esa variante (fp16) pesa ~139 MB y se descarga la primera vez; se calienta al cargar. Si no hay WebGPU o falla, vuelve sola a la CPU (variante q8 de ~73 MB, con varios hilos gracias al aislamiento de origen cruzado: cabeceras COOP/COEP en `vite.config.ts` y `tauri.conf.json`). En desarrollo, `mizuStt.backend` dice cuál se está usando.
+- El micrófono se ignora si hay una tarea en curso, y corta la voz del personaje para que no se oiga a sí misma.
+- Whisper inventa frases ("Subtítulos por…") cuando solo oye ruido; se filtran.
+- Si Windows pide permiso para el micrófono, hay que concederlo.
+
+#### Escucha continua: di «Mizu»
+
+El icono de la **oreja** deja el micrófono abierto y atento. Solo se hace caso a lo que **empieza por "Mizu"**; el resto (la tele, una llamada, una charla) se transcribe en local, se descarta y no sale de la app.
+
+- "Mizu, abre Steam y ejecuta CS2" → se envía "abre Steam y ejecuta CS2" al agente.
+- Solo "Mizu" → ladea la cabeza y se queda atenta ~8 s: la frase siguiente se acepta sin repetir el nombre. Pulsar el micrófono del menú equivale a decir "Mizu".
+- Tras hablar ella, la conversación queda abierta ~8 s para que contestes sin decir el nombre.
+- "Mizu, para" (también "detente", "cancela", "basta"...) detiene la tarea en curso. Con una tarea en marcha, lo demás espera.
+- Mientras habla no escucha, para no oírse a sí misma.
+- El estado se recuerda: si estaba encendida al cerrar, se retoma al arrancar.
+- "Mizu, para" funciona aunque Whisper lo escriba pegado ("Mezupara").
+- Whisper escribe el nombre de muchas formas (Misu, Mizo, Mezmo...): `WAKE_WORD` en `whisperProvider.ts` acepta una familia de grafías, y una frase de una sola palabra parecida a "Mizu" también cuenta. En desarrollo, `mizuStt.heard` lista lo último que oyó y si lo aceptó.
+- Las órdenes que abren programas pasan por el flujo de permisos de siempre (Aceptar / Rechazar).
+- Retardo: ~1 s entre que terminas de hablar y que empieza a trabajar (0,9 s de silencio + transcripción en la GPU).
+
+### Reacciones al trabajo real
+
+`core/reactions.ts` interpreta lo que hace el agente y el personaje reacciona con un gesto y, a veces, una frase corta (como máximo una cada 8 s):
+
+| Qué pasa | Reacción |
+|---|---|
+| Tests que pasan (`npm test`, `pytest`, `cargo test`...) | Pulgar arriba, corazón coreano o sonrisa + "Pasaron los N tests" |
+| Tests que fallan | Sorpresa o suspiro + "Fallaron N pruebas" |
+| Compila / no compila (`build`, `tsc`, `cargo build`...) | Asentir o sonrisa / suspiro + "Hay errores de compilación" |
+| `git commit` / `git push` | Asentir / pulgar arriba + "Subido al repositorio" |
+| Un comando o edición falla | Sorpresa (solo las dos primeras veces por turno) |
+| Pide un permiso | Ladea la cabeza |
+| Piensa más de 10 s | Mira hacia arriba |
+| Termina la tarea | Gesto alegre (o tímido/suspiro si hubo tropiezos); si fue larga, a veces se estira; si acaba con una pregunta, ladea la cabeza |
+
+El clasificador (`classifyToolResult`) mira el comando y la salida de las herramientas Bash/PowerShell. En desarrollo: `mizuReact.handle({...evento})` para probarlo.
 
 ### Voz
 
-El personaje habla al terminar una tarea (si usó herramientas o tardó 6 s o más), al pedir un permiso y ante errores. Solo dice frases cortas; no lee las respuestas. Lógica en `voice/announcer.ts`.
+El personaje habla al terminar una tarea (si usó herramientas o tardó 6 s o más), al pedir un permiso, ante errores y al reaccionar al trabajo (tests, compilación, git). Solo dice frases cortas; no lee las respuestas. Lógica en `voice/announcer.ts`.
+
+La voz es **Piper** con **Daniela** (`es_AR-daniela-high`, femenina, calidad "high", español latinoamericano), neuronal y local: `voice/piperProvider.ts`. La primera vez descarga el modelo (~109 MB desde Hugging Face, en segundo plano al arrancar) y queda en la caché de la ventana; mientras no esté listo (o si el navegador bloquea el audio) habla la voz de Windows. Trocea por frases y la inferencia corre en un worker, así que la ventana y el personaje no se congelan: la primera frase suena en menos de 1 s. La boca se mueve con una pulsación por palabra.
+
+#### Ánimo automático
+
+Cada frase se dice con un ánimo que se elige solo según lo que pasa (`Mood` en `tts.ts`); Piper lo traduce a variación, ritmo y estabilidad (`MOOD_SCALES` en `piperProvider.ts`):
+
+| Ánimo | Cuándo | Cómo suena |
+|---|---|---|
+| `alegre` | Tests que pasan, `git push`, "terminé" sin tropiezos | Entonación marcada y algo más rápida |
+| `calma` | Tests o compilación que fallan, errores, "terminé" tras tropiezos | Serena, regular y más lenta |
+| `atenta` | Al pedir un permiso | Un punto más expresiva, sin prisa |
+| `neutral` | El resto | La voz de siempre |
+
+Con tropiezos en el turno, el aviso de "terminé" también cambia de frase ("Terminé, pero hubo problemas por el camino…"). Para ajustar un ánimo, edita `MOOD_SCALES` (valores [variación, ritmo, estabilidad]; ritmo < 1 = más rápido). En desarrollo: `mizuTts.speak("texto", { mood: "alegre" })`.
+
+#### Pronunciación
+
+`voice/pronunciation.ts` reescribe antes de hablar las palabras en inglés, marcas y siglas como las diría un hispanohablante: "Steam" → "Estím", "GitHub" → "Guithab", "API" → "a pe i", "CS2" → "ce ese 2", "16 GB" → "16 gigas". Las siglas desconocidas (2-4 mayúsculas) se deletrean. Solo afecta a lo que se dice; el texto de pantalla no cambia. Para añadir una palabra, agrégala a `WORDS`.
 
 ## Agregar un adaptador (otro CLI)
 
@@ -85,7 +154,7 @@ El resto (proceso, eventos, frontend) no cambia.
 
 ## Cambiar el motor de voz
 
-Implementa `TTSProvider` (`src/voice/tts.ts`) —por ejemplo Piper, Kokoro o ElevenLabs— y devuélvelo desde `createTTS()` en `src/voice/webSpeechProvider.ts`. `onBoundary` está pensado para el lipsync.
+Implementa `TTSProvider` (`src/voice/tts.ts`) —por ejemplo Kokoro o ElevenLabs— y úsalo en `main.ts` en lugar de `createPiperTTS(createTTS())`. `onBoundary` está pensado para el lipsync. Hoy: Piper (Daniela) con la voz de Windows (`webSpeechProvider.ts`) como respaldo. Probadas y descartadas por ahora: `es_ES-sharvard-medium` (suena peor que Daniela) y Kokoro `ef_dora` (la única voz femenina española de Kokoro; en CPU tarda más que la duración del audio).
 
 ## Agregar un modelo
 
