@@ -8,9 +8,41 @@ type Input = Record<string, unknown>;
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 const clip = (s: string, max: number) => (s.length > max ? s.slice(0, max) + "…" : s);
 
+const DESKTOP_PREFIX = "mcp__mizu-desktop__";
+const pos = (i: Input, x = "x", y = "y") => `(${Math.round(Number(i[x]))}, ${Math.round(Number(i[y]))})`;
+
+/** Acciones de control del PC (servidor MCP propio): qué pide hacer, en lenguaje llano. */
+function describeDesktop(action: string, input: Input) {
+  switch (action) {
+    case "screenshot":
+      return { title: "¿Ver tu pantalla?", detail: "Mizu hará una captura para saber dónde está cada cosa.", note: "" };
+    case "screen_info":
+    case "cursor_position":
+    case "list_windows":
+      return { title: "¿Mirar el estado del escritorio?", detail: action === "list_windows" ? "Ver qué ventanas hay abiertas." : "Ver el tamaño de las pantallas o dónde está el ratón.", note: "" };
+    case "click":
+      return { title: input.double ? "¿Hacer doble clic?" : "¿Hacer clic?", detail: `En ${pos(input)} de la pantalla (botón ${str(input.button) || "izquierdo"}).`, note: "" };
+    case "move":
+      return { title: "¿Mover el ratón?", detail: `A ${pos(input)} de la pantalla.`, note: "" };
+    case "drag":
+      return { title: "¿Arrastrar con el ratón?", detail: `De ${pos(input, "from_x", "from_y")} a ${pos(input, "to_x", "to_y")}.`, note: "" };
+    case "scroll":
+      return { title: "¿Girar la rueda del ratón?", detail: `${Number(input.amount) > 0 ? "Hacia abajo" : "Hacia arriba"} en ${pos(input)}.`, note: "" };
+    case "type_text":
+      return { title: "¿Escribir este texto?", detail: clip(str(input.text), 400), note: "En la ventana que tenga el foco." };
+    case "key":
+      return { title: "¿Pulsar estas teclas?", detail: str(input.keys), note: "En la ventana que tenga el foco." };
+    case "focus_window":
+      return { title: "¿Cambiar a esta ventana?", detail: str(input.title), note: "" };
+    default:
+      return { title: `¿Permitir «${action}»?`, detail: clip(JSON.stringify(input), 300), note: "" };
+  }
+}
+
 /** Título y detalle legibles según la herramienta que pide permiso. */
 function describe(tool: string, raw: unknown, description?: string | null) {
   const input = (raw && typeof raw === "object" ? raw : {}) as Input;
+  if (tool.startsWith(DESKTOP_PREFIX)) return describeDesktop(tool.slice(DESKTOP_PREFIX.length), input);
   switch (tool) {
     case "Bash":
     case "PowerShell":

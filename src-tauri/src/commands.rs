@@ -93,6 +93,42 @@ pub fn agent_set_config(
     Ok(view(&app, config))
 }
 
+/// Cambia la forma de hablar (`mizu` o `claude`). El prompt se fija al lanzar el CLI, así que se reinicia el proceso, pero
+/// se conserva la conversación: la siguiente petición retoma la misma sesión con `--resume`.
+#[tauri::command]
+pub fn agent_set_persona(
+    app: AppHandle,
+    state: State<AgentState>,
+    persona: String,
+) -> Result<ConfigView, String> {
+    let config = {
+        let mut cfg = state.config.lock().unwrap();
+        cfg.persona = Some(persona);
+        cfg.clone()
+    };
+    state.save(&config);
+    state.stop_session();
+    Ok(view(&app, config))
+}
+
+/// Activa o desactiva el control del PC (servidor MCP de escritorio). Como la forma de hablar, se fija al lanzar el CLI:
+/// se reinicia el proceso pero se conserva la conversación (`--resume`).
+#[tauri::command]
+pub fn agent_set_desktop(
+    app: AppHandle,
+    state: State<AgentState>,
+    enabled: bool,
+) -> Result<ConfigView, String> {
+    let config = {
+        let mut cfg = state.config.lock().unwrap();
+        cfg.desktop = Some(enabled);
+        cfg.clone()
+    };
+    state.save(&config);
+    state.stop_session();
+    Ok(view(&app, config))
+}
+
 #[tauri::command]
 pub fn agent_send(app: AppHandle, state: State<AgentState>, text: String) -> Result<(), String> {
     let mut slot = state.session.lock().unwrap();

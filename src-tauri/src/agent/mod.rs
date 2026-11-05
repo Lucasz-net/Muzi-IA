@@ -54,6 +54,10 @@ pub struct AgentConfig {
     pub command: Option<String>,
     /// Modo de permisos del CLI (`default`, `acceptEdits`, `plan`...). `None` = el del CLI.
     pub permission_mode: Option<String>,
+    /// Forma de hablar: `mizu` (casual, breve y sin tecnicismos; por defecto) o `claude` (el estilo normal de Claude Code).
+    pub persona: Option<String>,
+    /// Control del PC (ver y manejar ratón y teclado con el servidor MCP propio). `None` = activado.
+    pub desktop: Option<bool>,
 }
 
 impl Default for AgentConfig {
@@ -63,6 +67,8 @@ impl Default for AgentConfig {
             cwd: None,
             command: None,
             permission_mode: None,
+            persona: None,
+            desktop: None,
         }
     }
 }

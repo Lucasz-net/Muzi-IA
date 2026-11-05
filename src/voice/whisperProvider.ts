@@ -3,13 +3,25 @@
 import ortAsyncifyWasm from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url";
 import ortAsyncifyMjs from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url";
 import type { ListenState, STTProvider } from "./stt";
+import { isLoneWakeLike, stripWakeWord } from "./wakeWord";
 
 /**
- * Whisper (base, multilingüe) ejecutándose dentro de la propia app con transformers.js: sin servidor,
+ * Whisper (multilingüe) ejecutándose dentro de la propia app con transformers.js: sin servidor,
  * sin internet (salvo la descarga única del modelo, ~73 MB, que queda en la caché de la ventana) y
  * sin mandar tu audio a nadie.
  */
-const MODEL = "onnx-community/whisper-base";
+/**
+ * Modelos a probar, por orden: Whisper-small en la tarjeta gráfica (fp16, ~463 MB: entiende mucho mejor los nombres y el
+ * español), Whisper-base en la tarjeta (~139 MB) y, si no hay WebGPU, base en la CPU (q8, ~73 MB). El primero que cargue
+ * y supere una transcripción de prueba es el que se usa; si uno falla (poca memoria de vídeo, descarga cortada...) se
+ * pasa al siguiente.
+ */
+const FP16 = { encoder_model: "fp16", decoder_model_merged: "fp16" };
+const CANDIDATES = [
+  { model: "onnx-community/whisper-small", device: "webgpu", dtype: FP16 },
+  { model: "onnx-community/whisper-base", device: "webgpu", dtype: FP16 },
+  { model: "onnx-community/whisper-base", device: "wasm", dtype: { encoder_model: "q8", decoder_model_merged: "q8" } },
+];
 const RATE = 16000;
 /** Ventana (muestras) con la que se mide el volumen: 100 ms. */
 const WINDOW = 1600;
@@ -35,16 +47,6 @@ const WAKE_MAX_S = 20;
 /** Frases pendientes de transcribir como máximo (si se acumulan, se descartan las más viejas). */
 const MAX_QUEUE = 2;
 
-/**
- * Palabra de activación al inicio de la frase. Whisper escribe "Mizu" de muchas formas (Misu, Mizo,
- * Mitsu, Mizú...), así que se acepta una familia de grafías, con un saludo opcional delante.
- */
-const WAKE_WORD =
-  /^\s*(?:(?:hey|ey|eh|oye|ok|hola)[\s,]+)?(?:m[iíy][sz]{1,2}[uúoó]+h?|m[eé][sz]{1,2}[mn]?[uúoó]+h?|m[eéiíy]t[sz]{1,2}[uúoó]+|m[iíy]\s[sz][uúoó]+)(?=[\s,.:;!?¡¿-]|$)[\s,.:;!?¡¿-]*/i;
-
-/** El nombre pegado a una orden de parar, sin espacio ("Mezupara", "Misudetente"). */
-const GLUED_STOP = /^\s*m[eéiíy][sz]{1,2}[mn]?[uúoó]h?(para|detente|cancela|basta|alto|stop)(?![\p{L}])/iu;
-
 /** Whisper inventa estas frases cuando oye ruido o silencio. */
 const HALLUCINATIONS = [
   /subt[ií]tulos/i,
@@ -57,7 +59,61 @@ const HALLUCINATIONS = [
 
 const WORKLET = `class R extends AudioWorkletProcessor{process(i){const c=i[0][0];if(c)this.port.postMessage(c.slice(0));return true}}registerProcessor("mizu-rec",R)`;
 
-type Asr = (audio: Float32Array, opts: Record<string, unknown>) => Promise<{ text: string } | { text: string }[]>;
+type AsrFn = (audio: Float32Array, opts: Record<string, unknown>) => Promise<{ text: string } | { text: string }[]>;
+/** Lo que se usa por dentro de la tubería de transformers.js para transcribir con un texto de contexto. */
+interface AsrInternals {
+  tokenizer: {
+    convert_tokens_to_ids(tokens: string[]): number[];
+    encode(text: string): number[];
+    decode(ids: number[], opts?: Record<string, unknown>): string;
+  };
+  processor: (audio: Float32Array) => Promise<{ input_features: unknown }>;
+  model: { generate(opts: Record<string, unknown>): Promise<{ tolist(): unknown[][] }> };
+}
+type Asr = AsrFn & AsrInternals;
+
+/**
+ * Texto de contexto para Whisper: con el nombre bien escrito delante tiende a escribirlo igual ("Mizu" en vez de "mis su",
+ * "me sub", "Mezbo"...). Sin órdenes dentro a propósito: si con ruido Whisper repitiera el contexto, no debe parecer un encargo.
+ */
+const WAKE_PROMPT = " Hola, Mizu. ¿Qué tal, Mizu? Mizu, ¿me oyes?";
+
+/** ¿Es solo un eco del texto de contexto? (con ruido o silencio Whisper a veces lo repite) */
+function isPromptEcho(text: string): boolean {
+  const flat = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z]/g, "");
+  const t = flat(text);
+  // Solo ecos largos: un "Mizu." suelto es justo lo que hay que reconocer y también está dentro del contexto.
+  return t.length >= 9 && flat(WAKE_PROMPT).includes(t);
+}
+
+/**
+ * Transcribe con el texto de contexto: el decodificador arranca con `<|startofprev|> contexto <|startoftranscript|>
+ * <|es|> <|transcribe|> <|notimestamps|>`, que es como Whisper recibe un "prompt". transformers.js no lo expone en la
+ * tubería, así que se llama al modelo directamente (una sola ventana de audio: las frases son cortas).
+ */
+async function transcribePrompted(asr: Asr, audio: Float32Array): Promise<string> {
+  const tok = asr.tokenizer;
+  const id = (t: string) => tok.convert_tokens_to_ids([t])[0];
+  const [prev, sot, es, task, noTimestamps, eot] = [
+    "<|startofprev|>",
+    "<|startoftranscript|>",
+    "<|es|>",
+    "<|transcribe|>",
+    "<|notimestamps|>",
+    "<|endoftext|>",
+  ].map(id);
+  const context = Array.from(tok.encode(WAKE_PROMPT)).filter((t) => t < eot); // solo texto, sin especiales
+  const { input_features } = await asr.processor(audio);
+  const out = await asr.model.generate({
+    inputs: input_features,
+    decoder_input_ids: [prev, ...context, sot, es, task, noTimestamps],
+    max_new_tokens: 160,
+  });
+  const seq = (out.tolist()[0] as (number | bigint)[]).map(Number);
+  // Lo transcrito va tras el último <|startoftranscript|> (y sus tres marcas de idioma, tarea y tiempos).
+  const generated = seq.slice(seq.lastIndexOf(sot) + 1).filter((t) => t < eot);
+  return tok.decode(generated, { skip_special_tokens: true }).trim();
+}
 
 interface Recorder {
   /** Audio recortado de la frase, o `null` si nadie habló o se canceló. */
@@ -261,40 +317,6 @@ const micMessage = (e: unknown) => {
   return `No pude abrir el micrófono: ${(e as Error)?.message ?? e}`;
 };
 
-/** Distancia de edición entre dos palabras cortas. */
-function editDistance(a: string, b: string): number {
-  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)]);
-  for (let j = 1; j <= b.length; j++) d[0][j] = j;
-  for (let i = 1; i <= a.length; i++)
-    for (let j = 1; j <= b.length; j++)
-      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-  return d[a.length][b.length];
-}
-
-/** Una frase corta de una sola palabra que suena parecido a "Mizu" (Whisper la oye mal sin contexto). */
-export function isLoneWakeLike(text: string): boolean {
-  const words = text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z\s]/g, " ")
-    .trim()
-    .split(/\s+/);
-  if (words.length !== 1 || words[0].length < 3 || words[0].length > 6) return false;
-  const d = editDistance(words[0], "mizu");
-  // Muy parecida ("Nizu", "Isu"), o con el esqueleto de "Mizu" (m + vocal + s/z: "Mezbo", "Mezmo", "Misu").
-  return d <= 2 || (/^m[eiy][sz]/.test(words[0]) && d <= 3);
-}
-
-/** Si el texto empieza por la palabra de activación, devuelve lo que viene después; si no, `null`. */
-export function stripWakeWord(text: string): string | null {
-  // Whisper a veces pega el nombre a la orden de parar ("Mezupara"): detener es lo más importante y no puede fallar por eso.
-  const glued = GLUED_STOP.exec(text);
-  if (glued) return glued[1];
-  const m = WAKE_WORD.exec(text);
-  return m ? text.slice(m[0].length).trim() : null;
-}
-
 /** Hay una tarjeta gráfica utilizable con WebGPU. */
 async function hasWebGpu(): Promise<boolean> {
   try {
@@ -321,6 +343,7 @@ export function createWhisperSTT(): STTProvider {
 
   let modelLoaded = false;
   let backend: "none" | "webgpu" | "wasm" = "none";
+  let modelName = "";
   let loading: Promise<Asr> | null = null;
   const loadModel = (): Promise<Asr> => {
     loading ??= (async () => {
@@ -346,26 +369,29 @@ export function createWhisperSTT(): STTProvider {
           setState("loading", `${pct} %`);
         }
       };
-      const make = (device: string, dtype: Record<string, string>) =>
-        pipeline("automatic-speech-recognition", MODEL, { dtype, device, progress_callback: progress } as never) as unknown as Promise<Asr>;
+      const make = (model: string, device: string, dtype: Record<string, string>) =>
+        pipeline("automatic-speech-recognition", model, { dtype, device, progress_callback: progress } as never) as unknown as Promise<Asr>;
 
       let asr: Asr | null = null;
-      // Primero la tarjeta gráfica (WebGPU): unas 3 veces más rápido que la CPU. Se calientan los shaders con un
-      // segundo de silencio, así la primera orden real no paga la compilación, y de paso se comprueba que funciona.
-      if (await hasWebGpu()) {
+      const gpu = await hasWebGpu();
+      for (const c of CANDIDATES) {
+        if (c.device === "webgpu" && !gpu) continue;
         try {
-          const gpu = await make("webgpu", { encoder_model: "fp16", decoder_model_merged: "fp16" });
-          await gpu(new Float32Array(RATE), { language: "spanish", task: "transcribe" });
-          asr = gpu;
-          backend = "webgpu";
-        } catch (e) {
-          console.warn("[stt] WebGPU no funcionó, se usa la CPU:", e);
-          files = new Map();
+          files = new Map(); // el progreso de cada intento empieza de cero
           lastPct = -1;
+          const candidate = await make(c.model, c.device, c.dtype);
+          // Se calientan los shaders con un segundo de silencio: la primera orden real no paga la compilación y, de paso,
+          // se comprueba que el modelo funciona de verdad en este equipo.
+          await candidate(new Float32Array(RATE), { language: "spanish", task: "transcribe" });
+          asr = candidate;
+          backend = c.device === "webgpu" ? "webgpu" : "wasm";
+          modelName = c.model.replace("onnx-community/", "");
+          break;
+        } catch (e) {
+          console.warn(`[stt] ${c.model} (${c.device}) no funcionó, se prueba el siguiente:`, e);
         }
       }
-      asr ??= await make("wasm", { encoder_model: "q8", decoder_model_merged: "q8" });
-      if (backend === "none") backend = "wasm";
+      if (!asr) throw new Error("ningún modelo de reconocimiento de voz funcionó en este equipo");
       modelLoaded = true;
       return asr;
     })().catch((e) => {
@@ -376,11 +402,30 @@ export function createWhisperSTT(): STTProvider {
   };
 
   /** Audio -> texto, ya sin las frases que Whisper inventa con el ruido ("" si no hay nada real). */
-  const transcribe = async (audio: Float32Array): Promise<string> => {
+  /** Ayuda de vocabulario para Whisper (ver `WAKE_PROMPT`): se usa mientras funcione; si falla una vez se desactiva y se usa el método normal. */
+  const bias = { prompt: true, broken: false };
+
+  /** Transcripción cruda (sin filtros), con o sin la ayuda de vocabulario. */
+  const rawTranscribe = async (audio: Float32Array, withPrompt: boolean): Promise<string> => {
     const asr = await loadModel();
+    if (withPrompt) return transcribePrompted(asr, audio);
     const out = await asr(audio, { language: "spanish", task: "transcribe" });
-    const text = (Array.isArray(out) ? out[0]?.text : out.text)?.trim() ?? "";
-    return text && !HALLUCINATIONS.some((h) => h.test(text)) ? text : "";
+    return (Array.isArray(out) ? out[0]?.text : out.text)?.trim() ?? "";
+  };
+
+  /** Audio -> texto, ya sin las frases que Whisper inventa con el ruido ("" si no hay nada real). */
+  const transcribe = async (audio: Float32Array): Promise<string> => {
+    let text = "";
+    if (bias.prompt && !bias.broken) {
+      try {
+        text = await rawTranscribe(audio, true);
+      } catch (e) {
+        bias.broken = true; // no se reintenta: se sigue con el método normal
+        console.warn("[stt] la ayuda de vocabulario falló, se transcribe sin ella:", e);
+        text = await rawTranscribe(audio, false);
+      }
+    } else text = await rawTranscribe(audio, false);
+    return text && !HALLUCINATIONS.some((h) => h.test(text)) && !isPromptEcho(text) ? text : "";
   };
 
   // ------------------------------------------------------------------ pulsar y hablar
@@ -395,6 +440,8 @@ export function createWhisperSTT(): STTProvider {
   const queue: Float32Array[] = [];
   let pumping = false;
   const heard: { text: string; secs: number; accepted: boolean }[] = [];
+  /** Solo desarrollo: las últimas frases (audio) para poder compararlas con otros ajustes. */
+  const recent: Float32Array[] = [];
 
   const closeConversation = () => {
     clearTimeout(convTimer);
@@ -432,6 +479,10 @@ export function createWhisperSTT(): STTProvider {
     try {
       while (queue.length && wake) {
         const audio = queue.shift()!;
+        if (import.meta.env.DEV) {
+          recent.push(audio.slice());
+          if (recent.length > 12) recent.shift();
+        }
         const text = await transcribe(audio);
         if (text && wake) handleText(text, audio.length / RATE);
         else if (!text) {
@@ -447,7 +498,7 @@ export function createWhisperSTT(): STTProvider {
   };
 
   const api: STTProvider = {
-    id: "whisper-base",
+    id: "whisper",
     get state() {
       return state;
     },
@@ -457,7 +508,11 @@ export function createWhisperSTT(): STTProvider {
     get backend() {
       return backend;
     },
+    get model() {
+      return modelName;
+    },
     heard,
+    debug: import.meta.env.DEV ? { recent, bias, run: rawTranscribe } : undefined,
     async start() {
       if (state !== "idle") return;
       const ready = loadModel(); // si es la primera vez, empieza a descargar mientras hablas

@@ -26,4 +26,8 @@ export const agent = {
     invoke<void>("agent_respond_permission", { requestId, allow, message: message ?? null }),
   getConfig: () => invoke<ConfigView>("agent_get_config"),
   setConfig: (config: AgentConfig) => invoke<ConfigView>("agent_set_config", { config }),
+  /** Cambia la forma de hablar sin perder la conversación. */
+  setPersona: (persona: string) => invoke<ConfigView>("agent_set_persona", { persona }),
+  /** Activa o desactiva el control del PC sin perder la conversación. */
+  setDesktop: (enabled: boolean) => invoke<ConfigView>("agent_set_desktop", { enabled }),
 };

@@ -1,8 +1,14 @@
 mod agent;
 mod commands;
+mod mcp_desktop;
 mod window;
 
 use tauri::Manager;
+
+/// Modo servidor MCP de control de escritorio (`mizu-ia --mcp-desktop`): lo lanza Claude Code, no abre ventana.
+pub fn run_mcp_desktop() {
+    mcp_desktop::run();
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,6 +29,8 @@ pub fn run() {
             window::set_click_through,
             commands::agent_get_config,
             commands::agent_set_config,
+            commands::agent_set_persona,
+            commands::agent_set_desktop,
             commands::agent_send,
             commands::agent_respond_permission,
             commands::agent_stop,

@@ -25,6 +25,13 @@ export interface PermissionRule {
 }
 
 const STORAGE_KEY = "mizu.permRules";
+/** Herramientas de control del PC que solo observan (no tocan nada): las únicas que pueden recordarse con «Siempre». */
+const DESKTOP_READ_ONLY: Record<string, string> = {
+  "mcp__mizu-desktop__screenshot": "Ver la pantalla (capturas)",
+  "mcp__mizu-desktop__list_windows": "Ver qué ventanas hay abiertas",
+  "mcp__mizu-desktop__screen_info": "Ver el tamaño de las pantallas",
+  "mcp__mizu-desktop__cursor_position": "Ver dónde está el ratón",
+};
 const SHELL_TOOLS = new Set(["Bash", "PowerShell"]);
 const FILE_TOOLS = new Set(["Edit", "Write", "NotebookEdit"]);
 
@@ -102,6 +109,9 @@ export function suggestRule(tool: string, raw: unknown): Omit<PermissionRule, "i
     return host ? { tool, kind: "host", value: host, label: `WebFetch a ${host}` } : null;
   }
   if (tool === "WebSearch") return { tool, kind: "tool", value: "*", label: "Búsquedas en internet" };
+  // Control del PC: solo se ofrece «Siempre» para lo que solo MIRA. Hacer clic, escribir o pulsar teclas se pregunta siempre.
+  const look = DESKTOP_READ_ONLY[tool];
+  if (look) return { tool, kind: "tool", value: "*", label: look };
   return null;
 }
 

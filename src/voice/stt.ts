@@ -20,6 +20,8 @@ export type ListenState =
 
 export interface STTProvider {
   readonly id: string;
+  /** Modelo de Whisper en uso una vez cargado ("whisper-small", "whisper-base"). */
+  readonly model: string;
   /** Dónde corre el modelo una vez cargado: `webgpu` (tarjeta gráfica) o `wasm` (CPU). */
   readonly backend: "none" | "webgpu" | "wasm";
   readonly state: ListenState;
@@ -52,4 +54,13 @@ export interface STTProvider {
   /** Se oyó solo la palabra de activación: el personaje debe mostrar que está atento. */
   onAttention(cb: () => void): () => void;
   onError(cb: (message: string) => void): () => void;
+  /** Solo desarrollo: audio reciente y transcripción a mano para comparar ajustes con voz real. */
+  readonly debug?: {
+    /** Últimas frases oídas en escucha continua (solo en memoria). */
+    recent: Float32Array[];
+    /** Ayuda de vocabulario para Whisper ("Mizu"): `prompt` la activa; `broken` indica que falló y se desactivó. */
+    bias: { prompt: boolean; broken: boolean };
+    /** Transcribe un audio con o sin la ayuda de vocabulario, sin filtros. */
+    run(audio: Float32Array, prompt: boolean): Promise<string>;
+  };
 }

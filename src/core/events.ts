@@ -21,6 +21,10 @@ export interface AgentConfig {
   cwd: string | null;
   command: string | null;
   permission_mode: string | null;
+  /** Forma de hablar: "mizu" (casual y breve, por defecto) o "claude" (estilo normal de Claude Code). */
+  persona?: string | null;
+  /** Control del PC (ver y manejar ratón y teclado): activado salvo que sea `false`. */
+  desktop?: boolean | null;
 }
 
 export interface ConfigView extends AgentConfig {

@@ -106,7 +106,26 @@ const bubble = createSpeechBubble(ui, {
 const rules = createRuleStore();
 const permissions = createPermissionPrompt(ui, rules);
 const rulesPanel = createRulesPanel(ui, rules);
-const settingsPanel = createSettingsPanel(ui, settings);
+/** Cambiar la forma de hablar o el control del PC reinicia el proceso de Claude Code (se fijan al lanzarlo) pero sigue la misma conversación. */
+const changeBackend = async (apply: () => Promise<unknown>) => {
+  if (busy) {
+    bubble.hint("Espera a que termine la tarea para cambiar eso", false);
+    setTimeout(() => bubble.hint(null), 3000);
+    return false;
+  }
+  await apply();
+  return true;
+};
+const settingsPanel = createSettingsPanel(ui, settings, {
+  persona: {
+    load: async () => (await agent.getConfig()).persona ?? "mizu",
+    save: (value) => changeBackend(() => agent.setPersona(value)),
+  },
+  desktop: {
+    load: async () => ((await agent.getConfig()).desktop === false ? "off" : "on"),
+    save: (value) => changeBackend(() => agent.setDesktop(value === "on")),
+  },
+});
 if (import.meta.env.DEV) Object.assign(window, { mizuUi: { bubble } });
 const history = createHistoryPanel(ui, () => {
   agent.newConversation().catch(console.error);

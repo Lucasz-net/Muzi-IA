@@ -22,6 +22,24 @@ const TOOL_ACTIONS: Record<string, string> = {
   WebSearch: "buscar en internet",
 };
 
+/** Acciones de control del PC (servidor MCP propio), dichas en voz alta. */
+const DESKTOP_ACTIONS: Record<string, string> = {
+  screenshot: "ver tu pantalla",
+  screen_info: "mirar tu escritorio",
+  cursor_position: "mirar tu escritorio",
+  list_windows: "ver qué ventanas tienes abiertas",
+  click: "hacer clic",
+  move: "mover el ratón",
+  drag: "arrastrar con el ratón",
+  scroll: "mover la rueda del ratón",
+  type_text: "escribir",
+  key: "pulsar unas teclas",
+  focus_window: "cambiar de ventana",
+  wait: "esperar un momento",
+};
+const actionFor = (tool: string) =>
+  tool.startsWith("mcp__mizu-desktop__") ? (DESKTOP_ACTIONS[tool.slice(19)] ?? "controlar el escritorio") : (TOOL_ACTIONS[tool] ?? `usar ${tool}`);
+
 const pick = (items: string[]) => items[Math.floor(Math.random() * items.length)];
 
 function loadEnabled(): boolean {
@@ -83,7 +101,7 @@ export function createAnnouncer(tts: TTSProvider, { isRough = () => false, suppr
           toolsUsed++;
           break;
         case "waiting_permission": {
-          const action = TOOL_ACTIONS[ev.tool_name] ?? `usar ${ev.tool_name}`;
+          const action = actionFor(ev.tool_name);
           say(`Necesito tu permiso para ${action}.`, "atenta", true);
           break;
         }
