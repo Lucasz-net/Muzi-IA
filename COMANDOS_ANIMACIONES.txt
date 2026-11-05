@@ -116,6 +116,11 @@ Todo esto funciona SOLO en modo desarrollo (npm run tauri dev).
       mizuStage.debug.character().autoGestures = false
       mizuStage.debug.character().autoGestures = true
 
+  La frecuencia se ajusta en el panel de Ajustes del menu (ninguno / pocos /
+  normal / muchos), o desde la consola:
+
+      mizuStage.setGestureLevel("pocos")     (off | pocos | normal | muchos)
+
   Las probabilidades estan en IDLE_GESTURES (src/character/gestures.ts).
 
 

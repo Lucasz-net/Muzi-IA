@@ -115,11 +115,11 @@ Los clips no mueven la cara, así que se le suma por código. En `animations.jso
 - `mood`: expresiones VRM de fondo mientras suena el clip (entran y salen con él).
 - `cues`: gestos de **cara y cabeza** de la tabla anterior (`wink`, `smile`, `laugh`, `shy`, `surprised`...; no uses los de brazos). `every: [mín, máx]` los lanza al azar cada tantos segundos de clip y `at: [s, ...]` en instantes fijos, para sincronizarlos con un paso concreto.
 
-Ya lo llevan los cinco bailes. Código: `VrmCharacter.clipFace`.
+Ya lo llevan los cinco bailes, con los guiños y risas **sincronizados con la coreografía**: los instantes (`at`) se hallaron analizando el movimiento de cada clip (energía angular de cabeza, torso y brazos) y buscando las pausas y poses marcadas, que es donde queda bien un guiño. Por ejemplo, en `Kawaii Kaiwai` guiña a los 5,4 s y a los 12,7 s y ríe en el remate (18,8 s). Para sincronizar un clip nuevo, reproduce el clip y anota en qué segundo cae cada paso (`mizuStage.debug.character().clips.playTime` da el segundo actual). Código: `VrmCharacter.clipFace`.
 
 ### Gestos automáticos en reposo
 
-Mientras el personaje está en `idle` **y no suena ningún clip**, lanza un gesto al azar cada 14-38 s de reposo procedural (el reloj solo corre en esos ratos, así que quedan muy espaciados). Las probabilidades están en `IDLE_GESTURES` (`gestures.ts`): los vistosos, como el corazón coreano, salen menos que una sonrisa. Para apagarlos: `mizuStage.debug.character().autoGestures = false`.
+Mientras el personaje está en `idle` **y no suena ningún clip**, lanza un gesto al azar cada 14-38 s de reposo procedural (el reloj solo corre en esos ratos, así que quedan muy espaciados). Las probabilidades están en `IDLE_GESTURES` (`gestures.ts`): los vistosos, como el corazón coreano, salen menos que una sonrisa. Para ajustarlos o apagarlos: panel de **Ajustes** del menú (ninguno / pocos / normal / muchos). En desarrollo también `mizuStage.setGestureLevel("pocos")` o `mizuStage.debug.character().autoGestures = false`.
 
 Al hablar, la cabeza también acompaña al habla con pequeños cabeceos.
 

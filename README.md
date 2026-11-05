@@ -85,6 +85,7 @@ El icono del micrófono del menú **escucha**: lo pulsas, hablas y, cuando dejas
 - El micrófono se ignora si hay una tarea en curso, y corta la voz del personaje para que no se oiga a sí misma.
 - Whisper inventa frases ("Subtítulos por…") cuando solo oye ruido; se filtran.
 - Si Windows pide permiso para el micrófono, hay que concederlo.
+- El runtime de onnxruntime que usa Whisper va **empaquetado** en la app (no se pide a ninguna CDN): una vez descargado el modelo, la escucha funciona sin internet.
 
 #### Escucha continua: di «Mizu»
 
@@ -124,6 +125,30 @@ El personaje habla al terminar una tarea (si usó herramientas o tardó 6 s o m�
 
 La voz es **Piper** con **Daniela** (`es_AR-daniela-high`, femenina, calidad "high", español latinoamericano), neuronal y local: `voice/piperProvider.ts`. La primera vez descarga el modelo (~109 MB desde Hugging Face, en segundo plano al arrancar) y queda en la caché de la ventana; mientras no esté listo (o si el navegador bloquea el audio) habla la voz de Windows. Trocea por frases y la inferencia corre en un worker, así que la ventana y el personaje no se congelan: la primera frase suena en menos de 1 s. La boca se mueve con una pulsación por palabra.
 
+#### Lectura de respuestas
+
+Mizu no solo da avisos: **lee sus respuestas en voz alta** (`voice/narrator.ts`). El ajuste está en el panel de **Ajustes** (icono de los deslizadores del menú):
+
+| Ajuste | Qué hace |
+|---|---|
+| **Solo avisos** | Como antes: "terminé", permisos y errores |
+| **Resumen** (por defecto) | Al terminar el turno dice las primeras frases de la respuesta final (hasta ~3 frases) y avisa de que el resto está en pantalla |
+| **Completa** | Va diciendo cada frase según llega la respuesta, sin esperar al final |
+
+- Antes de hablar se limpia el markdown (`voice/speakable.ts`): no se leen los bloques de código, las tablas ni las URLs ("un enlace"); las rutas pasan a ser el nombre del archivo ("main.ts" → "main punto te ese"); se quitan emojis, viñetas y símbolos. Si se dejó algo fuera añade "El resto está en pantalla."
+- Las frases se encolan (`TTSProvider.enqueue`): suenan seguidas, sin cortes ni huecos, mientras la respuesta aún llega. Un permiso, en cambio, interrumpe lo que esté leyendo.
+- Si el turno tuvo tropiezos la lectura es serena (`calma`); y el "terminé" se omite cuando ya está contando el resultado.
+- Escribir un mensaje, hablarle o pulsar detener corta la lectura.
+- El **botón del altavoz del globo** (aparece al pasar el ratón por el globo) lee la respuesta que se ve, entera y sea cual sea el ajuste; pulsarlo mientras habla la corta.
+
+#### Ajustes
+
+El panel de ajustes (`ui/settingsPanel.ts`, valores en `core/settings.ts`, guardados en `localStorage["mizu.settings"]`) tiene:
+- **Lectura de respuestas:** solo avisos / resumen / completa.
+- **Gestos en reposo:** ninguno / pocos (cada ~30-80 s) / normal (14-38 s) / muchos (5-17 s). Controla con qué frecuencia hace guiños, estiramientos o el corazón coreano cuando no hay nada que hacer.
+
+Los tres paneles laterales (historial, permisos recordados y ajustes) comparten sitio: abrir uno cierra los otros.
+
 #### Ánimo automático
 
 Cada frase se dice con un ánimo que se elige solo según lo que pasa (`Mood` en `tts.ts`); Piper lo traduce a variación, ritmo y estabilidad (`MOOD_SCALES` en `piperProvider.ts`):
@@ -140,6 +165,14 @@ Con tropiezos en el turno, el aviso de "terminé" también cambia de frase ("Ter
 #### Pronunciación
 
 `voice/pronunciation.ts` reescribe antes de hablar las palabras en inglés, marcas y siglas como las diría un hispanohablante: "Steam" → "Estím", "GitHub" → "Guithab", "API" → "a pe i", "CS2" → "ce ese 2", "16 GB" → "16 gigas". Las siglas desconocidas (2-4 mayúsculas) se deletrean. Solo afecta a lo que se dice; el texto de pantalla no cambia. Para añadir una palabra, agrégala a `WORDS`.
+
+## Estilo de la interfaz
+
+Toda la interfaz está en `src/style.css`, con un estilo discreto y moderno: superficies violeta grafito, acento lila (a juego con el pelo y la chaqueta del personaje), bordes finos, sombras suaves, botones "fantasma" y animaciones cortas. Los colores son variables al principio del archivo (`:root`: `--surface`, `--accent`, `--ok`, `--danger`...): cambiar la paleta entera es cambiar esas líneas.
+
+**El globo sigue a la cabeza.** `character/scene.ts` proyecta la cabeza del personaje a píxeles de la ventana en cada fotograma y publica `--head-x`, `--head-y` y `--head-r` (posición y radio) en `<html>`. El globo de diálogo, las tarjetas de permiso y la barra de chat se anclan con ellas: su borde interior queda a `--dock-gap` del centro de la cabeza, así que siempre están pegados al personaje, en plano medio o en cuerpo completo, y la colita del globo apunta a la cara. El globo se ajusta a su contenido (hasta `--bubble-w`) y deja libre en la base el hueco que necesitan el chat y los permisos (`--reserve`).
+
+Los indicadores flotantes (puntos al pensar, "!" al pedir permiso) son pequeños y de colores suaves (`character/indicators.ts`, constante `K` para su tamaño).
 
 ## Agregar un adaptador (otro CLI)
 
