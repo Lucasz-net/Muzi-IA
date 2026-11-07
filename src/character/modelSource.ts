@@ -9,8 +9,13 @@ const models = import.meta.glob<string>("/assets/models/*.vrm", {
   eager: true,
 });
 
-/** URL del primer modelo (orden alfabético), o `null` si no hay ninguno. */
+/** Fragmento del nombre del modelo preferido; si no coincide ninguno, se usa el primero por orden alfabético. */
+const PREFERRED_MODEL = "pelo_anime5";
+
+/** URL del modelo preferido (o el primero alfabéticamente), o `null` si no hay ninguno. */
 export function findModelUrl(): string | null {
   const names = Object.keys(models).sort();
-  return names.length > 0 ? models[names[0]] : null;
+  if (names.length === 0) return null;
+  const chosen = names.find((n) => n.includes(PREFERRED_MODEL)) ?? names[0];
+  return models[chosen];
 }

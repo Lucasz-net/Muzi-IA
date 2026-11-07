@@ -66,6 +66,8 @@ const UPPER_CUT = 0.38;
 
 /** Margen (m) sobre la cabeza en el encuadre. */
 const HEADROOM_M = 0.45;
+/** Margen máximo sobre la cabeza como fracción de la altura del modelo. */
+const HEADROOM_RATIO = 0.3;
 
 /** Cuánto de la rotación de cabeza se reparte entre cuello y cabeza. */
 const NECK_SHARE = 0.4;
@@ -176,12 +178,18 @@ class VrmCharacter implements Character {
     this.hipsRestX = this.hips.position.x;
     this.hipsRestY = this.hips.position.y;
 
-    // Dirección de cada brazo en T-pose, medida en el propio modelo.
+    // Dirección de cada brazo en T-pose, medida en el propio modelo. Se mide en el espacio local del
+    // padre del brazo (el mismo en el que se aplican las rotaciones) y no en el del mundo: en los
+    // VRM 0.x `rotateVRM0` gira la escena media vuelta, el eje X local queda invertido respecto al
+    // mundo y los brazos se levantaban en lugar de bajar.
     vrm.scene.updateMatrixWorld(true);
     const side = (arm: VRMHumanBoneName, hand: VRMHumanBoneName) => {
-      const a = this.bone(arm)?.getWorldPosition(new THREE.Vector3());
-      const h = this.bone(hand)?.getWorldPosition(new THREE.Vector3());
-      return a && h && h.x < a.x ? -1 : 1;
+      const armNode = this.bone(arm);
+      const handNode = this.bone(hand);
+      if (!armNode?.parent || !handNode) return 1;
+      const a = armNode.parent.worldToLocal(armNode.getWorldPosition(new THREE.Vector3()));
+      const h = armNode.parent.worldToLocal(handNode.getWorldPosition(new THREE.Vector3()));
+      return h.x < a.x ? -1 : 1;
     };
     this.armDir = {
       left: side("leftUpperArm", "leftHand"),
@@ -190,7 +198,8 @@ class VrmCharacter implements Character {
 
     // Encuadre: el modelo completo más margen arriba para brazos levantados, saltos e indicadores.
     const box = new THREE.Box3().setFromObject(vrm.scene);
-    const top = HEADROOM_M;
+    // El margen es proporcional a la altura con un tope: un modelo bajito (1,1 m) con 0,45 m fijos quedaba pequeño y abajo.
+    const top = Math.min(HEADROOM_M, (box.max.y - box.min.y) * HEADROOM_RATIO);
     const bottom = 0.05;
     const height = box.max.y - box.min.y + top + bottom;
     this.framing = { centerY: box.min.y - bottom + height / 2, height };
