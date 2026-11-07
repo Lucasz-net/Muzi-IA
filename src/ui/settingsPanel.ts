@@ -1,5 +1,7 @@
 import type { SettingsStore, Settings } from "../core/settings";
+import { memory, type MemoryNote } from "../core/bridge";
 import { el } from "./dom";
+import { icon } from "./icons";
 
 interface Option<K extends keyof Settings> {
   value: Settings[K];
@@ -21,6 +23,28 @@ const READ: Group<"read"> = {
     { value: "off", label: "Solo avisos" },
     { value: "resumen", label: "Resumen" },
     { value: "completa", label: "Completa" },
+  ],
+};
+
+const TRANSLATION: Group<"translation"> = {
+  key: "translation",
+  title: "Traducción del subtítulo",
+  hint: "Muestra en español, bajo las letras japonesas, lo que dice Mizu.",
+  options: [
+    { value: "on", label: "Mostrar" },
+    { value: "off", label: "Ocultar" },
+  ],
+};
+
+const CHATTER: Group<"chatter"> = {
+  key: "chatter",
+  title: "Charla en reposo",
+  hint: "Cada cuánto dice frases sueltas en japonés cuando no hay nada que hacer. No habla mientras trabajas con el micrófono abierto ni si la voz está silenciada.",
+  options: [
+    { value: "off", label: "Callada" },
+    { value: "poca", label: "Poca" },
+    { value: "normal", label: "Normal" },
+    { value: "mucha", label: "Mucha" },
   ],
 };
 
@@ -122,12 +146,62 @@ export function createSettingsPanel(parent: HTMLElement, settings: SettingsStore
       .catch(console.error);
   };
 
+  /** Volumen propio de Mizu: un deslizador que se guarda al moverlo. */
+  const volumeValue = el("span", { class: "setting-value" });
+  const volumeSlider = () => {
+    const input = el("input", { class: "slider", interactive: true });
+    input.type = "range";
+    input.min = "0";
+    input.max = "100";
+    input.step = "5";
+    const fill = () => input.style.setProperty("--p", `${input.value}%`);
+    input.value = String(settings.get().volume);
+    fill();
+    input.addEventListener("input", () => {
+      fill();
+      settings.set({ volume: Number(input.value) });
+    });
+    settings.onChange((s) => {
+      volumeValue.textContent = `${s.volume} %`;
+      if (Number(input.value) !== s.volume) {
+        input.value = String(s.volume);
+        fill();
+      }
+    });
+    volumeValue.textContent = `${settings.get().volume} %`;
+    section("Volumen de Mizu", el("div", { class: "slider-row" }, input, volumeValue), "Volumen de su voz, además del de Windows. En el mezclador de volumen de Windows también aparece como «Mizu-IA».");
+  };
+
+  /** Lo que Mizu recuerda de ti: se vuelve a pedir cada vez que se abre el panel y se borra de uno en uno. */
+  const memoryList = el("div", { class: "memory-list" });
+  const renderMemory = (notes: MemoryNote[]) => {
+    memoryList.replaceChildren();
+    if (!notes.length) {
+      memoryList.append(el("div", { class: "memory-empty", text: "Aún no recuerda nada. Dile «recuerda que…» y lo guardará." }));
+      return;
+    }
+    for (const note of notes) {
+      const remove = el("button", { class: "memory-del", title: "Olvidar esto", interactive: true }, icon("close"));
+      remove.addEventListener("click", () => memory.remove(note.id).then(refreshMemory).catch(console.error));
+      memoryList.append(el("div", { class: "memory-item" }, el("span", { text: note.text }), remove));
+    }
+    const clear = el("button", { class: "link-btn", text: "Olvidar todo", interactive: true });
+    clear.addEventListener("click", () => memory.clear().then(refreshMemory).catch(console.error));
+    memoryList.append(clear);
+  };
+  const refreshMemory = () => memory.list().then(renderMemory).catch(console.error);
+  section("Lo que recuerda Mizu", memoryList, "Notas que guarda sobre ti entre conversaciones. Si borras una, la olvida en la próxima conversación nueva. Nunca guarda contraseñas ni datos de pago.");
+  renderMemory([]);
+
   if (backend) {
     backendGroup("persona", PERSONA, backend.persona);
     backendGroup("desktop", DESKTOP, backend.desktop);
   }
+  group(CHATTER);
+  group(TRANSLATION);
   group(READ);
   group(GESTURES);
+  volumeSlider();
 
   const render = () => {
     const now = settings.get();
@@ -146,6 +220,7 @@ export function createSettingsPanel(parent: HTMLElement, settings: SettingsStore
     },
     toggle() {
       root.classList.toggle("hidden");
+      if (!root.classList.contains("hidden")) void refreshMemory();
       return !root.classList.contains("hidden");
     },
     close() {

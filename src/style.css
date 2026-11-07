@@ -1,26 +1,31 @@
 /* =====================================================================================================
-   Mizu-IA: interfaz. Estilo discreto y moderno: superficies violeta grafito, acento lila (en armonía con el pelo y la
-   chaqueta del personaje), bordes finos, sombras suaves, botones "fantasma" y animaciones cortas.
+   Mizu-IA: interfaz. Un solo sistema de diseño, estilo Apple: grafito neutro, un único acento azul, esquinas
+   generosas, líneas finísimas, tipografía del sistema, controles al estilo iOS (segmentado, deslizador, listas
+   agrupadas) y animaciones cortas. Todo sale de estas variables: cambiar --accent recolorea toda la interfaz.
    ===================================================================================================== */
 :root {
-  /* Superficies */
-  --surface: rgba(25, 22, 38, 0.93);
-  --surface-2: rgba(33, 29, 50, 0.95);
-  --surface-solid: rgba(22, 19, 33, 0.98);
-  --inset: rgba(10, 8, 20, 0.55);
-  --line: rgba(255, 255, 255, 0.08);
-  --line-strong: rgba(189, 172, 255, 0.26);
+  /* Materiales */
+  --surface: rgba(36, 36, 39, 0.94);
+  --surface-2: rgba(44, 44, 48, 0.96);
+  --surface-solid: #262629;
+  --fill: rgba(255, 255, 255, 0.06);
+  --fill-hover: rgba(255, 255, 255, 0.1);
+  --inset: rgba(0, 0, 0, 0.28);
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.16);
   /* Texto y colores */
-  --text: #ecebf5;
-  --text-dim: #cfcce0;
-  --muted: #9a97ae;
-  --accent: #bba9ff;
-  --accent-soft: rgba(187, 169, 255, 0.16);
-  --accent-ink: #1c1530;
-  --ok: #82ddb0;
-  --danger: #ff9494;
-  --shadow: 0 12px 32px rgba(8, 6, 20, 0.5), 0 2px 8px rgba(8, 6, 20, 0.35);
-  --shadow-sm: 0 6px 18px rgba(8, 6, 20, 0.4);
+  --text: #f5f5f7;
+  --text-dim: #d1d1d6;
+  --muted: #98989f;
+  --accent: #0a84ff;
+  --accent-hover: #409cff;
+  --accent-soft: rgba(10, 132, 255, 0.2);
+  --accent-ink: #ffffff;
+  --ok: #30d158;
+  --danger: #ff453a;
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 8px 22px rgba(0, 0, 0, 0.38);
+  --radius: 18px;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* Ventana simétrica (1180 px): [franja de diálogo][personaje][franja de diálogo].
@@ -48,9 +53,9 @@ body {
   background: transparent;
   overflow: hidden;
   user-select: none;
-  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-family: -apple-system, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   font-size: 13px;
-  letter-spacing: 0.005em;
+  letter-spacing: -0.003em;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
@@ -105,6 +110,11 @@ button {
 svg {
   display: block;
 }
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 /* Barras de desplazamiento finas y discretas. */
 .bubble-body,
@@ -147,9 +157,9 @@ svg {
   flex-direction: column;
   gap: 5px;
   padding: 9px 13px 11px;
-  background: linear-gradient(165deg, rgba(41, 36, 64, 0.95), rgba(26, 23, 40, 0.95));
-  border: 1px solid var(--line-strong);
-  border-radius: 16px;
+  background: var(--surface-solid);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   box-shadow: var(--shadow);
   transform-origin: 100% 40px;
 }
@@ -185,9 +195,9 @@ svg {
   right: -7px;
   width: 12px;
   height: 12px;
-  background: rgb(36, 32, 55);
-  border-top: 1px solid var(--line-strong);
-  border-right: 1px solid var(--line-strong);
+  background: var(--surface-solid);
+  border-top: 1px solid var(--line);
+  border-right: 1px solid var(--line);
   border-radius: 0 3px 0 0;
   transform: rotate(45deg);
 }
@@ -195,8 +205,8 @@ svg {
   right: auto;
   left: -7px;
   border: none;
-  border-bottom: 1px solid var(--line-strong);
-  border-left: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line);
+  border-left: 1px solid var(--line);
   border-radius: 0 0 0 3px;
 }
 .bubble-head {
@@ -208,22 +218,10 @@ svg {
 /* El nombre: un punto lila con un halo suave y el texto en pequeño; discreto, no una etiqueta llamativa. */
 .bubble-name {
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--accent);
-  font-size: 11px;
+  color: var(--text);
+  font-size: 12.5px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.bubble-name::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 8px 1px rgba(187, 169, 255, 0.6);
+  letter-spacing: -0.01em;
 }
 .bubble-status {
   flex: 1;
@@ -313,17 +311,17 @@ svg {
   color: var(--text);
 }
 .bubble-body code {
-  padding: 1px 5px;
-  border-radius: 5px;
+  padding: 1px 6px;
+  border-radius: 6px;
   background: var(--accent-soft);
-  color: #e6defe;
+  color: var(--text);
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 11.5px;
 }
 .bubble-body pre {
   margin: 6px 0;
-  padding: 8px 10px;
-  border-radius: 9px;
+  padding: 9px 11px;
+  border-radius: 10px;
   background: var(--inset);
   border: 1px solid var(--line);
   overflow-x: auto;
@@ -349,7 +347,7 @@ svg {
 .md-mark {
   flex: none;
   min-width: 0.9em;
-  color: var(--accent);
+  color: var(--muted);
 }
 .history-open .bubble {
   visibility: hidden;
@@ -377,18 +375,17 @@ svg {
   bottom: 64px;
 }
 .perm-card {
-  padding: 10px 12px 11px;
-  background: var(--surface-2);
-  border: 1px solid var(--line-strong);
-  border-left: 3px solid var(--accent);
-  border-radius: 14px;
+  padding: 12px 14px 13px;
+  background: var(--surface-solid);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   animation: bubble-in 0.22s var(--ease);
 }
 .perm-title {
   font-weight: 600;
-  font-size: 12.5px;
-  margin-bottom: 6px;
+  font-size: 13px;
+  margin-bottom: 8px;
 }
 .perm-detail {
   color: var(--text-dim);
@@ -398,8 +395,8 @@ svg {
   overflow-y: auto;
   word-break: break-all;
   white-space: pre-wrap;
-  padding: 6px 8px;
-  border-radius: 8px;
+  padding: 7px 9px;
+  border-radius: 9px;
   background: var(--inset);
   user-select: text;
 }
@@ -424,44 +421,45 @@ svg {
   word-break: break-all;
 }
 .btn {
-  padding: 5px 13px;
+  padding: 6px 15px;
   border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.05);
-  font-size: 12px;
+  border: none;
+  background: var(--fill-hover);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 500;
   transition:
     background 0.15s,
-    border-color 0.15s,
-    color 0.15s;
+    color 0.15s,
+    transform 0.15s;
 }
 .btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.16);
+}
+.btn:active {
+  transform: scale(0.97);
 }
 .btn.accept {
-  background: var(--ok);
-  border-color: var(--ok);
-  color: #0b2418;
+  background: var(--accent);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 .btn.accept:hover {
-  background: #9be8c0;
+  background: var(--accent-hover);
 }
 .btn.always {
-  background: transparent;
-  border-color: var(--line-strong);
-  color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
 }
 .btn.always:hover {
-  background: var(--accent-soft);
-  border-color: var(--accent);
+  background: rgba(10, 132, 255, 0.32);
 }
 .btn.reject {
   color: var(--text-dim);
 }
 .btn.reject:hover {
-  border-color: var(--danger);
+  background: rgba(255, 69, 58, 0.16);
   color: var(--danger);
-  background: rgba(255, 148, 148, 0.08);
 }
 
 /* =====================================================================================================
@@ -474,7 +472,7 @@ svg {
   flex-direction: column;
   background: var(--surface-solid);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 20px;
   box-shadow: var(--shadow);
   overflow: hidden;
   animation: panel-in 0.2s var(--ease);
@@ -482,7 +480,7 @@ svg {
 @keyframes panel-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(6px) scale(0.99);
   }
 }
 .chat-open .history {
@@ -492,35 +490,31 @@ svg {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 11px 14px 9px;
-  border-bottom: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 11px;
+  padding: 15px 16px 11px;
+  color: var(--text);
+  font-size: 15px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: -0.015em;
 }
 .link-btn {
   background: none;
   border: none;
-  color: var(--accent);
-  font-size: 11.5px;
+  color: var(--accent-hover);
+  font-size: 12.5px;
+  font-weight: 500;
   letter-spacing: 0;
-  text-transform: none;
   padding: 0;
-  opacity: 0.9;
 }
 .link-btn:hover {
-  opacity: 1;
-  text-decoration: underline;
+  color: #7ab8ff;
 }
 .history-list {
   flex: 1;
   overflow-y: auto;
-  padding: 10px 14px 12px;
+  padding: 4px 14px 14px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
   user-select: text;
 }
 .entry {
@@ -532,11 +526,10 @@ svg {
 .entry.user {
   align-self: flex-end;
   max-width: 88%;
-  padding: 6px 11px;
-  border-radius: 14px 14px 4px 14px;
-  background: var(--accent-soft);
-  border: 1px solid var(--line-strong);
-  color: var(--text);
+  padding: 7px 12px;
+  border-radius: 17px 17px 5px 17px;
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 .entry.tool {
   display: flex;
@@ -570,19 +563,34 @@ svg {
   opacity: 1;
 }
 .entry.system {
-  color: var(--accent);
+  color: var(--muted);
   font-size: 11.5px;
 }
 .entry.error {
   color: var(--danger);
 }
-/* Permisos recordados */
+/* Permisos recordados: lista agrupada, como en los ajustes de iOS */
+.rules-list {
+  gap: 0;
+}
 .rule-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 2px;
-  border-bottom: 1px solid var(--line);
+  padding: 9px 12px;
+  background: var(--fill);
+}
+.rule-item:first-child {
+  border-radius: 12px 12px 0 0;
+}
+.rule-item:last-child {
+  border-radius: 0 0 12px 12px;
+}
+.rule-item:only-child {
+  border-radius: 12px;
+}
+.rule-item + .rule-item {
+  box-shadow: inset 0 1px 0 var(--line);
 }
 .rule-label {
   flex: 1;
@@ -603,46 +611,139 @@ svg {
 .rule-empty {
   color: var(--muted);
 }
-/* Ajustes */
+/* Ajustes: cada ajuste es una tarjeta agrupada */
+.settings-list {
+  gap: 10px;
+}
 .setting {
-  padding: 11px 2px 13px;
-  border-bottom: 1px solid var(--line);
+  padding: 13px 14px 14px;
+  background: var(--fill);
+  border-radius: 14px;
 }
 .setting-title {
   font-weight: 600;
-  margin-bottom: 8px;
+  font-size: 13px;
+  margin-bottom: 10px;
 }
 .setting-hint {
-  margin-top: 8px;
+  margin-top: 10px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 11.5px;
   line-height: 1.45;
 }
-.seg {
+.memory-list {
   display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
 }
-.seg-btn {
-  padding: 5px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
+.memory-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px 7px 11px;
+  border-radius: 10px;
+  background: var(--fill);
   font-size: 12px;
   color: var(--text-dim);
+}
+.memory-del {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+.memory-del svg {
+  width: 12px;
+  height: 12px;
+}
+.memory-del:hover {
+  background: var(--fill-hover);
+  color: var(--text);
+}
+.memory-empty {
+  font-size: 12px;
+  color: var(--muted);
+}
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+/* Deslizador al estilo iOS: pista fina con relleno hasta el valor (--p) y pomo blanco. */
+.slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  margin: 0;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--accent) var(--p, 50%), rgba(255, 255, 255, 0.18) var(--p, 50%));
+  cursor: pointer;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 1px 5px rgba(0, 0, 0, 0.5),
+    0 0 0 0.5px rgba(0, 0, 0, 0.2);
+  transition: transform 0.12s;
+}
+.slider:active::-webkit-slider-thumb {
+  transform: scale(1.08);
+}
+.setting-value {
+  min-width: 40px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+/* Control segmentado: una sola pista y una pastilla elevada en la opción activa. */
+.seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--inset);
+  border-radius: 10px;
+}
+.seg-btn {
+  flex: 1 1 auto;
+  padding: 5px 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--text-dim);
   transition:
-    background 0.15s,
-    border-color 0.15s,
-    color 0.15s;
+    background 0.18s,
+    color 0.18s,
+    box-shadow 0.18s;
 }
 .seg-btn:hover {
-  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
 }
 .seg-btn.active {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
   font-weight: 600;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.1);
 }
 
 /* =====================================================================================================
@@ -669,13 +770,14 @@ svg {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  border: 1px solid var(--line);
-  background: rgba(24, 21, 36, 0.78);
+  border: none;
+  background: rgba(38, 38, 41, 0.86);
   color: var(--text-dim);
-  box-shadow: 0 2px 8px rgba(8, 6, 20, 0.3);
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 0.5px var(--line-strong);
   transition:
     background 0.15s,
-    border-color 0.15s,
     color 0.15s,
     opacity 0.15s,
     transform 0.15s,
@@ -686,21 +788,22 @@ svg {
   height: 17px;
 }
 .icon-btn:hover {
-  background: rgba(46, 40, 70, 0.95);
-  border-color: var(--line-strong);
+  background: rgba(60, 60, 65, 0.96);
   color: #fff;
 }
+.icon-btn:active {
+  transform: scale(0.94);
+}
 .icon-btn.active {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 /* El punto plegado: casi invisible hasta que se acerca el ratón. */
 .menu-trigger {
   width: 26px;
   height: 26px;
   opacity: 0.35;
-  background: rgba(24, 21, 36, 0.5);
+  background: rgba(38, 38, 41, 0.55);
   box-shadow: none;
   cursor: grab;
 }
@@ -713,13 +816,13 @@ svg {
   opacity: 1;
 }
 .icon-btn.mic.listening {
-  background: rgba(255, 148, 148, 0.22);
+  background: rgba(255, 69, 58, 0.22);
   border-color: var(--danger);
   color: var(--danger);
   animation: mic-pulse 1.1s ease-in-out infinite;
 }
 .icon-btn.mic.standby {
-  box-shadow: 0 0 0 2px rgba(187, 169, 255, 0.45);
+  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.45);
 }
 .icon-btn.mic.working {
   opacity: 0.6;
@@ -728,10 +831,10 @@ svg {
 @keyframes mic-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 148, 148, 0.5);
+    box-shadow: 0 0 0 0 rgba(255, 69, 58, 0.5);
   }
   50% {
-    box-shadow: 0 0 0 9px rgba(255, 148, 148, 0);
+    box-shadow: 0 0 0 9px rgba(255, 69, 58, 0);
   }
 }
 @keyframes mic-wait {
@@ -744,13 +847,13 @@ svg {
   }
 }
 .icon-btn.stop {
-  background: rgba(255, 148, 148, 0.2);
+  background: rgba(255, 69, 58, 0.2);
   border-color: var(--danger);
   color: var(--danger);
 }
 .icon-btn.stop:hover {
   background: var(--danger);
-  color: #2a0a0a;
+  color: #fff;
 }
 .menu-items {
   display: flex;
@@ -782,12 +885,12 @@ svg {
   visibility: visible;
 }
 .menu-sep {
-  width: 16px;
+  width: 14px;
   height: 1px;
   background: var(--line-strong);
 }
 .icon-btn.quit:hover {
-  background: rgba(255, 148, 148, 0.2);
+  background: rgba(255, 69, 58, 0.2);
   border-color: var(--danger);
   color: var(--danger);
 }
@@ -804,8 +907,8 @@ svg {
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  padding: 5px 5px 5px 15px;
-  background: var(--surface);
+  padding: 5px 5px 5px 16px;
+  background: var(--surface-solid);
   border: 1px solid var(--line);
   border-radius: 22px;
   box-shadow: var(--shadow-sm);
@@ -822,7 +925,7 @@ svg {
   border-color: var(--line-strong);
   box-shadow:
     var(--shadow-sm),
-    0 0 0 3px rgba(187, 169, 255, 0.12);
+    0 0 0 3px rgba(10, 132, 255, 0.12);
 }
 .field {
   flex: 1;
@@ -856,7 +959,7 @@ svg {
     transform 0.15s;
 }
 .send-btn:hover {
-  background: #cfc1ff;
+  background: var(--accent-hover);
 }
 .send-btn:active {
   transform: scale(0.94);
@@ -867,5 +970,66 @@ svg {
 }
 .send-btn.stop {
   background: var(--danger);
-  color: #2a0a0a;
+  color: #fff;
+}
+
+/* =====================================================================================================
+   Subtítulo japonés sobre la cabeza del personaje: las letras aparecen siguiendo la voz; debajo, la traducción.
+   No captura clics (queda fuera del hit-test).
+   ===================================================================================================== */
+.caption {
+  position: absolute;
+  left: var(--head-x);
+  /* Ancla su borde inferior sobre la cabeza y crece hacia arriba; nunca se sale por el borde superior. */
+  top: max(78px, calc(var(--head-y) - var(--head-r) - 18px));
+  transform: translate(-50%, -100%) scale(0.96);
+  max-width: min(480px, calc(100% - 2 * var(--zone) - 12px));
+  padding: 9px 16px 10px;
+  box-sizing: border-box;
+  text-align: center;
+  background: rgba(30, 30, 34, 0.72);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  transition: opacity 0.28s var(--ease), transform 0.28s var(--ease);
+  pointer-events: none;
+}
+.caption.show {
+  opacity: 1;
+  transform: translate(-50%, -100%) scale(1);
+}
+.cap-ja {
+  font-family: "Yu Gothic UI", "Meiryo UI", "Hiragino Sans", "Noto Sans JP", "Segoe UI", sans-serif;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  overflow-wrap: anywhere;
+}
+.cap-ch {
+  display: inline-block;
+  white-space: pre;
+  opacity: 0;
+  transform: translateY(7px) scale(0.85);
+  filter: blur(2px);
+  transition: opacity 0.16s var(--ease), transform 0.2s var(--ease), filter 0.16s var(--ease);
+}
+.cap-ch.on {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+.cap-es {
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-dim);
+}
+.cap-es.off {
+  display: none;
 }

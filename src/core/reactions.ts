@@ -1,5 +1,4 @@
 import type { AgentEvent } from "./events";
-import type { Mood } from "../voice/tts";
 
 /**
  * Reacciones al trabajo real. El agente avisa de cada herramienta que usa y de su resultado; aquí se
@@ -65,10 +64,10 @@ export function classifyToolResult(name: string, command: string, output: string
 
 interface Reaction {
   gestures: { name: string; weight: number }[];
-  /** Frase que dice (si la voz está activada); sin ella, solo gesto. */
-  say?: (count?: number) => string;
-  /** Con qué ánimo la dice: contenta si salió bien, serena si salió mal. */
-  mood?: Mood;
+  /** Categoría de frases en japonés que dice (ver `voice/jaVoice.ts`); sin ella, solo gesto. */
+  say?: string;
+  /** Probabilidad de decirla (por defecto, siempre): los resultados de rutina no merecen una frase cada vez. */
+  sayChance?: number;
 }
 
 const g = (name: string, weight = 1) => ({ name, weight });
@@ -76,18 +75,16 @@ const g = (name: string, weight = 1) => ({ name, weight });
 const REACTIONS: Record<Outcome, Reaction> = {
   tests_pass: {
     gestures: [g("thumbsUp", 2), g("fingerHeart", 1.2), g("smile", 2)],
-    say: (n) => (n ? `¡Pasaron los ${n} tests!` : "¡Los tests pasaron!"),
-    mood: "alegre",
+    say: "tests_pass",
   },
   tests_fail: {
     gestures: [g("surprised", 2), g("sigh", 1.5)],
-    say: (n) => (n === 1 ? "Falló una prueba." : n ? `Fallaron ${n} pruebas.` : "Fallaron algunas pruebas."),
-    mood: "calma",
+    say: "tests_fail",
   },
-  build_ok: { gestures: [g("nod", 2), g("smile")] },
-  build_fail: { gestures: [g("sigh", 2), g("surprised")], say: () => "Hay errores de compilación.", mood: "calma" },
-  git_commit: { gestures: [g("nod")] },
-  git_push: { gestures: [g("thumbsUp", 2), g("peace")], say: () => "¡Subido al repositorio!", mood: "alegre" },
+  build_ok: { gestures: [g("nod", 2), g("smile")], say: "build_ok", sayChance: 0.5 },
+  build_fail: { gestures: [g("sigh", 2), g("surprised")], say: "build_fail" },
+  git_commit: { gestures: [g("nod")], say: "git_commit", sayChance: 0.6 },
+  git_push: { gestures: [g("thumbsUp", 2), g("peace")], say: "git_push" },
   error: { gestures: [g("surprised")] },
 };
 
@@ -109,8 +106,8 @@ const pick = (items: { name: string; weight: number }[]) => {
 
 export interface ReactionDeps {
   gesture: (name: string) => boolean;
-  /** Dice una frase (respeta si la voz está activada). */
-  say: (text: string, mood?: Mood) => void;
+  /** Dice una frase de la categoría (respeta si la voz está activada). */
+  say: (category: string) => void;
 }
 
 export function createReactions({ gesture, say }: ReactionDeps) {
@@ -129,11 +126,11 @@ export function createReactions({ gesture, say }: ReactionDeps) {
     if (!force && now - lastGestureAt < GESTURE_GAP_MS) return;
     if (gesture(name)) lastGestureAt = now;
   };
-  const doSay = (text: string, mood?: Mood) => {
+  const doSay = (category: string, chance = 1) => {
     const now = Date.now();
-    if (now - lastSpeechAt < SPEECH_GAP_MS) return;
+    if (now - lastSpeechAt < SPEECH_GAP_MS || Math.random() > chance) return;
     lastSpeechAt = now;
-    say(text, mood);
+    say(category);
   };
   const stopThink = () => {
     clearTimeout(thinkTimer);
@@ -180,7 +177,7 @@ export function createReactions({ gesture, say }: ReactionDeps) {
           if (c.outcome === "error" && errors > 2) break;
           const r = REACTIONS[c.outcome];
           doGesture(pick(r.gestures));
-          if (r.say) doSay(r.say(c.count), r.mood);
+          if (r.say) doSay(r.say, r.sayChance);
           break;
         }
         case "waiting_permission":

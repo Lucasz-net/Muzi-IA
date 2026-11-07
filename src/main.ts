@@ -16,6 +16,8 @@ import { watchDialogSide } from "./ui/layout";
 import { createMenu } from "./ui/menu";
 import { createSpeechBubble } from "./ui/speechBubble";
 import { createAnnouncer } from "./voice/announcer";
+import { createJaVoice } from "./voice/jaVoice";
+import { createCaption } from "./ui/caption";
 import { createPiperTTS } from "./voice/piperProvider";
 import { createTTS } from "./voice/webSpeechProvider";
 import { createWhisperSTT } from "./voice/whisperProvider";
@@ -41,23 +43,47 @@ const narrator = createNarrator(tts, {
   isRough: () => reactions.rough,
   enabled: () => announcer.enabled, // el botón de silenciar del menú también calla la lectura
 });
-// Los avisos ("terminé", permisos, errores). Si el narrador ya cuenta el resultado, el "terminé" sobra.
-const announcer = createAnnouncer(tts, { isRough: () => reactions.rough, suppressDone: () => narrator.willSpeak });
+// La voz de Mizu: frases cortas en japonés pregrabadas (arranque, órdenes, trabajo, permisos, "terminé", errores, charla en reposo).
+const ja = createJaVoice();
+const announcer = createAnnouncer(ja, tts, {
+  isRough: () => reactions.rough,
+  suppressDone: () => narrator.willSpeak,
+  chatter: () => settings.get().chatter,
+  // Sin charla suelta mientras se graba o transcribe una orden.
+  canChatter: () => stt.state !== "listening" && stt.state !== "transcribing" && stt.state !== "loading",
+});
 
 // --- Micrófono (voz a texto con Whisper local) ---
 const stt = createWhisperSTT();
 
 // --- Reacciones al trabajo real (tests, compilación, git, errores...) ---
-const reactions = createReactions({ gesture: (name) => stage.gesture(name), say: (text, mood) => announcer.say(text, mood) });
+const reactions = createReactions({ gesture: (name) => stage.gesture(name), say: (category) => announcer.play(category) });
 
 // La voz mueve la boca (lipsync) y el cursor atrae la mirada.
 tts.onSpeakingChange((speaking) => {
   stage.setSpeaking(speaking);
   bubble.setReading(speaking); // el botón de leer del globo se marca mientras habla
 });
+ja.onSpeakingChange((speaking) => stage.setSpeaking(speaking));
+ja.onPulse(() => stage.pulseMouth());
 // Gestos en reposo según el ajuste (hay que esperar a que cargue el modelo: el de relleno no los hace).
 stage.modelReady.then(() => stage.setGestureLevel(settings.get().gestures)).catch(console.error);
 settings.onChange((s) => stage.setGestureLevel(s.gestures));
+// Saludo al arrancar (si el audio está permitido; si no, se omite en silencio).
+stage.modelReady.then(() => setTimeout(() => announcer.play("startup"), 1500)).catch(console.error);
+// Volumen propio de la voz; al soltar el deslizador suena una frase corta para oír cómo queda.
+tts.setVolume?.(settings.get().volume / 100);
+ja.setVolume(settings.get().volume / 100);
+let volumePreview: ReturnType<typeof setTimeout> | undefined;
+let lastVolume = settings.get().volume;
+settings.onChange((s) => {
+  if (s.volume === lastVolume) return;
+  lastVolume = s.volume;
+  tts.setVolume?.(s.volume / 100);
+  ja.setVolume(s.volume / 100);
+  clearTimeout(volumePreview);
+  volumePreview = setTimeout(() => announcer.play("preview", { interrupt: true }), 500);
+});
 tts.onBoundary(() => stage.pulseMouth());
 cursor.onMove((x, y) => stage.setGaze(x, y)).catch(console.error);
 
@@ -77,7 +103,7 @@ if (import.meta.env.DEV) {
   mizuSay("texto")                         voz + lipsync
   mizuUi.bubble.handle({ type: "message", text: "**hola**", is_delta: false })   probar el globo
 Clips cargados: ${stage.listClips().join(", ") || "(ninguno todavía)"}`);
-  Object.assign(window, { mizu: machine, mizuSay: (text: string) => tts.speak(text), mizuTts: tts, mizuStage: stage, mizuHelp });
+Object.assign(window, { mizu: machine, mizuSay: (text: string) => tts.speak(text), mizuTts: tts, mizuJa: ja, mizuStage: stage, mizuHelp });
 }
 
 // --- Vista (cuerpo completo / plano medio), recordada entre sesiones ---
@@ -127,6 +153,17 @@ const settingsPanel = createSettingsPanel(ui, settings, {
   },
 });
 if (import.meta.env.DEV) Object.assign(window, { mizuUi: { bubble } });
+// Subtítulo japonés sobre la cabeza, con la traducción debajo (ajuste).
+const caption = createCaption(ui, { translation: () => settings.get().translation === "on" });
+ja.onLine((line, shown) => caption.update(line, shown));
+let lastChatter = settings.get().chatter;
+settings.onChange((s) => {
+  caption.refresh();
+  if (s.chatter !== lastChatter) {
+    lastChatter = s.chatter;
+    announcer.rescheduleChatter();
+  }
+});
 const history = createHistoryPanel(ui, () => {
   agent.newConversation().catch(console.error);
   bubble.reset();
@@ -193,6 +230,7 @@ stt.onTranscript((text) => {
   }
   if (busy) {
     // Hay una tarea en marcha: solo se puede detener. Lo demás espera.
+    announcer.play("busy", { interrupt: true });
     bubble.hint("Estoy trabajando. Dime «Mizu, para» si quieres detenerme.", false);
     setTimeout(() => bubble.hint(null), 3500);
     return;
@@ -200,12 +238,19 @@ stt.onTranscript((text) => {
   stage.gesture("nod");
   submit(text);
 });
-stt.onAttention(() => stage.gesture("tilt")); // dijo solo "Mizu": la veo atenta
+stt.onAttention(() => {
+  stage.gesture("tilt"); // dijo solo "Mizu": la veo atenta
+  announcer.play("attention", { interrupt: true });
+});
 stt.onError((message) => bubble.handle({ type: "error", message }));
 
 // Mientras habla no se escucha (para que no se oiga a sí misma); al terminar, la conversación queda abierta unos segundos.
 let muteToken = 0;
-tts.onSpeakingChange((speaking) => {
+const onAnySpeaking = (cb: (speaking: boolean) => void) => {
+  tts.onSpeakingChange(cb);
+  ja.onSpeakingChange(cb);
+};
+onAnySpeaking((speaking) => {
   const token = ++muteToken;
   if (speaking) return stt.setMuted(true);
   setTimeout(() => {
@@ -255,6 +300,7 @@ const side = createMenu(ui, {
       if (busy) return;
       tts.cancel();
       stage.gesture("tilt");
+      announcer.play("attention", { interrupt: true });
       return stt.openConversation(8);
     }
     if (stt.state === "listening") return stt.finish();
@@ -306,6 +352,8 @@ agent
     bubble.handle(ev);
     history.handle(ev);
     permissions.handle(ev);
+    // Oculta en la bandeja no puede pedirte permiso a ciegas: reaparece (también si ya estaba visible, no hace nada).
+    if (ev.type === "waiting_permission") app.setVisible(true).catch(console.error);
     if (ev.type === "done" || ev.type === "error" || ev.type === "idle") setBusy(false);
   })
   .catch(console.error);

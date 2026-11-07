@@ -1,0 +1,1138 @@
+{
+ "startup": [
+  {
+   "id": "startup_01",
+   "ja": "おはよう！ 今日もよろしくね。",
+   "es": "¡Buenos días! Hoy también cuento contigo.",
+   "ms": 2208,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "startup_02",
+   "ja": "ただいま〜！ 準備できたよ。",
+   "es": "¡Ya volví! Estoy lista.",
+   "ms": 2208,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "startup_03",
+   "ja": "こんにちは！ 呼んでくれてうれしいな。",
+   "es": "¡Hola! Me alegra que me hayas llamado.",
+   "ms": 2645,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "startup_04",
+   "ja": "起動完了！ いつでもどうぞ。",
+   "es": "¡Arranque completo! Cuando quieras.",
+   "ms": 2507,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "attention": [
+  {
+   "id": "attention_01",
+   "ja": "はーい？",
+   "es": "¿Sí?",
+   "ms": 864,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "attention_02",
+   "ja": "なあに？",
+   "es": "¿Qué pasa?",
+   "ms": 843,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "attention_03",
+   "ja": "はい、聞いてるよ。",
+   "es": "Sí, te escucho.",
+   "ms": 1803,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "attention_04",
+   "ja": "うん？ どうしたの？",
+   "es": "¿Mm? ¿Qué pasó?",
+   "ms": 2059,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "attention_05",
+   "ja": "ここにいるよ。",
+   "es": "Aquí estoy.",
+   "ms": 1099,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "attention_06",
+   "ja": "呼んだ？",
+   "es": "¿Me llamaste?",
+   "ms": 811,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "ack": [
+  {
+   "id": "ack_01",
+   "ja": "わかった！",
+   "es": "¡Entendido!",
+   "ms": 779,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ack_02",
+   "ja": "了解！",
+   "es": "¡Recibido!",
+   "ms": 747,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ack_03",
+   "ja": "はーい、やってみるね。",
+   "es": "Vale, voy a intentarlo.",
+   "ms": 2080,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ack_04",
+   "ja": "まかせて！",
+   "es": "¡Déjamelo a mí!",
+   "ms": 811,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ack_05",
+   "ja": "うんうん、了解だよ。",
+   "es": "Sí, sí, entendido.",
+   "ms": 2208,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ack_06",
+   "ja": "いいよ、やってみる！",
+   "es": "¡Claro, lo intento!",
+   "ms": 1909,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "thinking": [
+  {
+   "id": "thinking_01",
+   "ja": "うーん…",
+   "es": "Mmm…",
+   "ms": 587,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "thinking_02",
+   "ja": "えっと…",
+   "es": "Veamos…",
+   "ms": 768,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "thinking_03",
+   "ja": "ちょっと考えるね。",
+   "es": "Déjame pensar un momento.",
+   "ms": 1397,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "thinking_04",
+   "ja": "むむむ…",
+   "es": "Mmmm…",
+   "ms": 693,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "thinking_05",
+   "ja": "どうしようかな。",
+   "es": "¿Qué hago?",
+   "ms": 1195,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "thinking_06",
+   "ja": "うーんとね…",
+   "es": "A ver, pues…",
+   "ms": 885,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "thinking_07",
+   "ja": "ふむふむ…",
+   "es": "Ajá, ajá…",
+   "ms": 832,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "thinking_08",
+   "ja": "考え中だよ…",
+   "es": "Estoy pensando…",
+   "ms": 1355,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "working": [
+  {
+   "id": "working_01",
+   "ja": "よいしょ、よいしょ。",
+   "es": "Ea, ea.",
+   "ms": 1653,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "working_02",
+   "ja": "がんばってるよ！",
+   "es": "¡Me estoy esforzando!",
+   "ms": 1152,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "working_03",
+   "ja": "カタカタ…",
+   "es": "Tec, tec, tec…",
+   "ms": 811,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "working_04",
+   "ja": "ちょっと待っててね。",
+   "es": "Espérame un poquito.",
+   "ms": 1248,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "working_05",
+   "ja": "ふんふん♪",
+   "es": "Mm-mm♪",
+   "ms": 704,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "working_06",
+   "ja": "もうちょっとだよ。",
+   "es": "Ya falta poco.",
+   "ms": 1141,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "working_07",
+   "ja": "順調だよ！",
+   "es": "¡Va todo bien!",
+   "ms": 1067,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "working_08",
+   "ja": "集中、集中…。",
+   "es": "Concentración, concentración…",
+   "ms": 1771,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "working_09",
+   "ja": "いま作業中だよ。",
+   "es": "Estoy trabajando ahora.",
+   "ms": 1451,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "working_10",
+   "ja": "ふふ、いい感じ。",
+   "es": "Jeje, va quedando bien.",
+   "ms": 1685,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "working_11",
+   "ja": "あとちょっと！",
+   "es": "¡Un poquito más!",
+   "ms": 917,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "working_12",
+   "ja": "手を動かしてるよ。",
+   "es": "Estoy manos a la obra.",
+   "ms": 1429,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "tool_edit": [
+  {
+   "id": "tool_edit_01",
+   "ja": "ここを直すね。",
+   "es": "Voy a arreglar esto.",
+   "ms": 1152,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "tool_edit_02",
+   "ja": "ちょっと書き換えるよ。",
+   "es": "Voy a reescribir un poco.",
+   "ms": 1461,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "tool_edit_03",
+   "ja": "ファイルを編集してるよ。",
+   "es": "Estoy editando el archivo.",
+   "ms": 1749,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "tool_command": [
+  {
+   "id": "tool_command_01",
+   "ja": "コマンドを動かすね。",
+   "es": "Voy a ejecutar el comando.",
+   "ms": 1504,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "tool_command_02",
+   "ja": "実行するよ！",
+   "es": "¡Ejecuto!",
+   "ms": 1195,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "tool_command_03",
+   "ja": "ポチッとな。",
+   "es": "Clic, y listo.",
+   "ms": 917,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "tool_search": [
+  {
+   "id": "tool_search_01",
+   "ja": "調べてみるね。",
+   "es": "Voy a investigar.",
+   "ms": 1173,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "tool_search_02",
+   "ja": "ネットで探してるよ。",
+   "es": "Estoy buscando en internet.",
+   "ms": 1515,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "tool_search_03",
+   "ja": "ええと、検索検索…。",
+   "es": "A ver, buscar, buscar…",
+   "ms": 2187,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "tool_read": [
+  {
+   "id": "tool_read_01",
+   "ja": "ファイルを読んでるよ。",
+   "es": "Estoy leyendo el archivo.",
+   "ms": 1387,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "tool_read_02",
+   "ja": "ふむふむ、なるほど。",
+   "es": "Ajá, ya veo.",
+   "ms": 1845,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "tool_read_03",
+   "ja": "中身を見てみるね。",
+   "es": "Voy a mirar qué hay dentro.",
+   "ms": 1440,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "responding": [
+  {
+   "id": "responding_01",
+   "ja": "えっとね、こうだよ。",
+   "es": "A ver, es así.",
+   "ms": 1803,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "responding_02",
+   "ja": "答えるね。",
+   "es": "Te respondo.",
+   "ms": 939,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "responding_03",
+   "ja": "できたよ、見てみて。",
+   "es": "Ya está, mira.",
+   "ms": 1845,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "responding_04",
+   "ja": "お返事するね。",
+   "es": "Te contesto.",
+   "ms": 1184,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "responding_05",
+   "ja": "あのね…",
+   "es": "Verás…",
+   "ms": 672,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "responding_06",
+   "ja": "説明するよ。",
+   "es": "Te lo explico.",
+   "ms": 1280,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "perm_generic": [
+  {
+   "id": "perm_generic_01",
+   "ja": "許可が必要だよ。",
+   "es": "Necesito tu permiso.",
+   "ms": 1483,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "perm_generic_02",
+   "ja": "ちょっといい？ 確認してほしいな。",
+   "es": "¿Tienes un segundo? Quiero que lo confirmes.",
+   "ms": 2741,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "perm_generic_03",
+   "ja": "お願い、許可をください。",
+   "es": "Por favor, dame permiso.",
+   "ms": 2016,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "perm_generic_04",
+   "ja": "見てほしいことがあるの。",
+   "es": "Hay algo que quiero que veas.",
+   "ms": 1717,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "perm_command": [
+  {
+   "id": "perm_command_01",
+   "ja": "コマンドを実行してもいい？",
+   "es": "¿Puedo ejecutar un comando?",
+   "ms": 2080,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "perm_command_02",
+   "ja": "ちょっとコマンドを動かしたいな。許可してくれる？",
+   "es": "Quiero ejecutar un comando. ¿Me das permiso?",
+   "ms": 3520,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "perm_edit": [
+  {
+   "id": "perm_edit_01",
+   "ja": "ファイルを書き換えてもいい？",
+   "es": "¿Puedo modificar un archivo?",
+   "ms": 1920,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "perm_edit_02",
+   "ja": "ここを編集したいの。いいかな？",
+   "es": "Quiero editar esto. ¿Puedo?",
+   "ms": 2752,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "perm_web": [
+  {
+   "id": "perm_web_01",
+   "ja": "ネットを見に行ってもいい？",
+   "es": "¿Puedo ir a mirar en internet?",
+   "ms": 1867,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "perm_web_02",
+   "ja": "ウェブで調べたいな。許可してね。",
+   "es": "Quiero buscar en la web. Dame permiso.",
+   "ms": 2496,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "perm_screen": [
+  {
+   "id": "perm_screen_01",
+   "ja": "画面を見てもいい？",
+   "es": "¿Puedo mirar tu pantalla?",
+   "ms": 1579,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "perm_screen_02",
+   "ja": "ちょっとだけ、画面をのぞくね。いい？",
+   "es": "Voy a echar un vistazo a la pantalla. ¿Vale?",
+   "ms": 3541,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "perm_mouse": [
+  {
+   "id": "perm_mouse_01",
+   "ja": "マウスを動かしてもいい？",
+   "es": "¿Puedo mover el ratón?",
+   "ms": 1920,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "perm_mouse_02",
+   "ja": "クリックしてもいいかな？",
+   "es": "¿Puedo hacer clic?",
+   "ms": 1728,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "perm_keys": [
+  {
+   "id": "perm_keys_01",
+   "ja": "キーボードを使ってもいい？",
+   "es": "¿Puedo usar el teclado?",
+   "ms": 1984,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "perm_keys_02",
+   "ja": "文字を入力したいな。許可してね。",
+   "es": "Quiero escribir algo. Dame permiso.",
+   "ms": 2816,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "perm_window": [
+  {
+   "id": "perm_window_01",
+   "ja": "ウィンドウを切り替えてもいい？",
+   "es": "¿Puedo cambiar de ventana?",
+   "ms": 2016,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "perm_window_02",
+   "ja": "別のウィンドウに移るね。いいかな？",
+   "es": "Voy a pasar a otra ventana. ¿Puedo?",
+   "ms": 2987,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "done_ok": [
+  {
+   "id": "done_ok_01",
+   "ja": "終わったよ！",
+   "es": "¡Terminé!",
+   "ms": 949,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "done_ok_02",
+   "ja": "できた！ 見てみて。",
+   "es": "¡Listo! Mira.",
+   "ms": 1632,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "done_ok_03",
+   "ja": "完了だよ、おつかれさま！",
+   "es": "¡Completado! Buen trabajo.",
+   "ms": 2240,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "done_ok_04",
+   "ja": "ばっちりだよ！",
+   "es": "¡Ha salido perfecto!",
+   "ms": 1045,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "done_ok_05",
+   "ja": "やったね、終わったよ！",
+   "es": "¡Lo logramos, terminé!",
+   "ms": 1877,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "done_ok_06",
+   "ja": "ふう、無事に終わったよ。",
+   "es": "Uf, terminé sin problemas.",
+   "ms": 2379,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "done_ok_07",
+   "ja": "お待たせ！ 終わったよ。",
+   "es": "¡Gracias por esperar! Terminé.",
+   "ms": 1899,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "done_ok_08",
+   "ja": "任務完了！",
+   "es": "¡Misión cumplida!",
+   "ms": 1077,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "done_rough": [
+  {
+   "id": "done_rough_01",
+   "ja": "終わったけど、ちょっと問題があったみたい。",
+   "es": "Terminé, pero parece que hubo algún problema.",
+   "ms": 3072,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "done_rough_02",
+   "ja": "終わったよ。でも、確認してほしいな。",
+   "es": "Terminé. Pero me gustaría que lo revisaras.",
+   "ms": 3371,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "done_rough_03",
+   "ja": "うーん、うまくいかなかったところがあるよ。",
+   "es": "Mmm, hay partes que no salieron bien.",
+   "ms": 3531,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "done_rough_04",
+   "ja": "一応終わったけど、見てくれる？",
+   "es": "Terminé, más o menos. ¿Lo miras?",
+   "ms": 2656,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "done_long": [
+  {
+   "id": "done_long_01",
+   "ja": "長かったね〜、やっと終わったよ！",
+   "es": "Se hizo largo, ¡por fin terminé!",
+   "ms": 2645,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "done_long_02",
+   "ja": "ふぅ、ずいぶんかかったよ。おつかれさま！",
+   "es": "Uf, tardó bastante. ¡Buen trabajo!",
+   "ms": 3648,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "done_long_03",
+   "ja": "ずっと待たせちゃってごめんね。終わったよ！",
+   "es": "Perdona por hacerte esperar tanto. ¡Terminé!",
+   "ms": 3029,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "error": [
+  {
+   "id": "error_01",
+   "ja": "あれ？ エラーが出ちゃった。",
+   "es": "¿Eh? Ha salido un error.",
+   "ms": 2283,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "error_02",
+   "ja": "うう、何か失敗しちゃった。",
+   "es": "Uy, algo ha fallado.",
+   "ms": 2592,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "error_03",
+   "ja": "ごめんね、うまくいかなかった。",
+   "es": "Perdona, no ha salido bien.",
+   "ms": 2496,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "error_04",
+   "ja": "あれれ、おかしいな…。",
+   "es": "Vaya, qué raro…",
+   "ms": 1685,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "error_05",
+   "ja": "エラーだよ、どうしよう。",
+   "es": "Es un error, ¿qué hacemos?",
+   "ms": 1899,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "tests_pass": [
+  {
+   "id": "tests_pass_01",
+   "ja": "テスト、全部通ったよ！",
+   "es": "¡Todos los tests pasaron!",
+   "ms": 2219,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "tests_pass_02",
+   "ja": "やった！ テスト成功！",
+   "es": "¡Bien! ¡Tests superados!",
+   "ms": 1995,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "tests_pass_03",
+   "ja": "ばっちり、テスト合格だよ！",
+   "es": "¡Perfecto, tests aprobados!",
+   "ms": 2411,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "tests_fail": [
+  {
+   "id": "tests_fail_01",
+   "ja": "テストが失敗しちゃった…。",
+   "es": "Los tests han fallado…",
+   "ms": 1749,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "tests_fail_02",
+   "ja": "うーん、テストが通らないよ。",
+   "es": "Mmm, los tests no pasan.",
+   "ms": 2699,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "tests_fail_03",
+   "ja": "あれ、テストでエラーが出たよ。",
+   "es": "Eh, ha salido un error en los tests.",
+   "ms": 2485,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "build_ok": [
+  {
+   "id": "build_ok_01",
+   "ja": "ビルド成功だよ！",
+   "es": "¡La compilación salió bien!",
+   "ms": 1419,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "build_ok_02",
+   "ja": "ちゃんと動いたよ！",
+   "es": "¡Ha funcionado!",
+   "ms": 1312,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "build_fail": [
+  {
+   "id": "build_fail_01",
+   "ja": "ビルドでエラーが出たよ。",
+   "es": "Hay un error al compilar.",
+   "ms": 1664,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "build_fail_02",
+   "ja": "コンパイルが通らないみたい…。",
+   "es": "Parece que no compila…",
+   "ms": 1941,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "git_commit": [
+  {
+   "id": "git_commit_01",
+   "ja": "コミットしたよ！",
+   "es": "¡Commit hecho!",
+   "ms": 1173,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "git_commit_02",
+   "ja": "変更を記録したよ。",
+   "es": "He guardado los cambios.",
+   "ms": 1685,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "git_push": [
+  {
+   "id": "git_push_01",
+   "ja": "アップロード完了！",
+   "es": "¡Subida completada!",
+   "ms": 1461,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "git_push_02",
+   "ja": "プッシュできたよ！",
+   "es": "¡Push hecho!",
+   "ms": 1184,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "git_push_03",
+   "ja": "ちゃんと送れたよ！",
+   "es": "¡Se envió bien!",
+   "ms": 1344,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "stopped": [
+  {
+   "id": "stopped_01",
+   "ja": "止めるね。",
+   "es": "Paro.",
+   "ms": 789,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "stopped_02",
+   "ja": "はい、ストップ！",
+   "es": "¡Vale, stop!",
+   "ms": 1707,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "stopped_03",
+   "ja": "わかった、やめておくね。",
+   "es": "Entendido, lo dejo.",
+   "ms": 2176,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "busy": [
+  {
+   "id": "busy_01",
+   "ja": "ごめんね、いま作業中なの。",
+   "es": "Perdona, ahora estoy trabajando.",
+   "ms": 2560,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "busy_02",
+   "ja": "ちょっと待ってね、まだ終わってないよ。",
+   "es": "Espera un poco, aún no termino.",
+   "ms": 2731,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "busy_03",
+   "ja": "作業が終わるまで待っててね。",
+   "es": "Espera hasta que acabe el trabajo.",
+   "ms": 2059,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "idle": [
+  {
+   "id": "idle_01",
+   "ja": "ひまだなぁ…。",
+   "es": "Qué aburrimiento…",
+   "ms": 917,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_02",
+   "ja": "なにかお手伝いしようか？",
+   "es": "¿Te ayudo con algo?",
+   "ms": 1963,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_03",
+   "ja": "ふんふふ〜ん♪",
+   "es": "Mm-mm-mmm♪",
+   "ms": 1739,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_04",
+   "ja": "ねえねえ、ちょっと休憩しない？",
+   "es": "Oye, oye, ¿descansamos un poco?",
+   "ms": 2624,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_05",
+   "ja": "今日もがんばってるね。",
+   "es": "Hoy también te estás esforzando.",
+   "ms": 1493,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_06",
+   "ja": "水分補給、忘れないでね。",
+   "es": "No te olvides de beber agua.",
+   "ms": 2528,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_07",
+   "ja": "目を休めるのも大事だよ。",
+   "es": "También es importante descansar la vista.",
+   "ms": 1941,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_08",
+   "ja": "えへへ、見てるだけで楽しいな。",
+   "es": "Jeje, con solo mirar ya me divierto.",
+   "ms": 2464,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_09",
+   "ja": "肩のストレッチしよ〜。",
+   "es": "Vamos a estirar los hombros.",
+   "ms": 1568,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_10",
+   "ja": "ふわぁ…ちょっと眠いかも。",
+   "es": "Aaah… creo que tengo un poco de sueño.",
+   "ms": 2187,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_11",
+   "ja": "何か面白いこと、ないかな？",
+   "es": "¿No habrá algo divertido por ahí?",
+   "ms": 2656,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_12",
+   "ja": "呼んでくれたらいつでも来るよ。",
+   "es": "Si me llamas, vengo cuando quieras.",
+   "ms": 1952,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_13",
+   "ja": "がんばりすぎないでね。",
+   "es": "No te esfuerces demasiado.",
+   "ms": 1504,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_14",
+   "ja": "今日は何を作るの？",
+   "es": "¿Qué vas a hacer hoy?",
+   "ms": 1707,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_15",
+   "ja": "いい天気かな？",
+   "es": "¿Hará buen tiempo?",
+   "ms": 1269,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_16",
+   "ja": "ずっと座ってると疲れちゃうよ。",
+   "es": "Estar sentado tanto rato cansa.",
+   "ms": 2123,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_17",
+   "ja": "ねえ、聞こえてる？",
+   "es": "Oye, ¿me oyes?",
+   "ms": 1931,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_18",
+   "ja": "お菓子食べたいなぁ。",
+   "es": "Me apetece algo dulce…",
+   "ms": 1333,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_19",
+   "ja": "のんびりするのも大切だね。",
+   "es": "Relajarse también es importante.",
+   "ms": 1984,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_20",
+   "ja": "私はここにいるからね。",
+   "es": "Yo estoy aquí contigo.",
+   "ms": 1792,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "preview": [
+  {
+   "id": "preview_01",
+   "ja": "こんにちは、これが私の声だよ。",
+   "es": "Hola, esta es mi voz.",
+   "ms": 2688,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ]
+}

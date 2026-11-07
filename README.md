@@ -53,8 +53,12 @@ src/
   core/                events.ts, bridge.ts, stateMachine.ts, clickThrough.ts
   character/           scene, animator, procedural (poses), placeholder, types
   ui/                  chatInput, speechBubble, historyPanel, permissionPrompt
-  voice/               tts.ts (TTSProvider), webSpeechProvider.ts, announcer.ts
-assets/models/         Tu modelo .vrm
+  voice/               jaVoice.ts (frases en japonés), announcer.ts, tts.ts (TTSProvider), piperProvider.ts, webSpeechProvider.ts, narrator.ts
+  ui/caption.ts        subtítulo japonés animado
+assets/models/         Tu modelo .vrm (no se versiona)
+assets/voice/ja/       Audios de Mizu en japonés
+tools/voicevox/        Frases y generador de los audios
+tools/blender/         Receta para acortar el pelo del modelo y añadirle colisiones
 assets/animations/     Clips por estado (ver su README)
 ```
 
@@ -124,9 +128,17 @@ El clasificador (`classifyToolResult`) mira el comando y la salida de las herram
 
 ### Voz
 
-El personaje habla al terminar una tarea (si usó herramientas o tardó 6 s o más), al pedir un permiso, ante errores y al reaccionar al trabajo (tests, compilación, git). Solo dice frases cortas; no lee las respuestas. Lógica en `voice/announcer.ts`.
+La voz de Mizu son **frases cortas en japonés pregrabadas** (VOICEVOX:四国めたん, estilo «あまあま»; 134 audios en `assets/voice/ja/`, ~11 MB). La app no sintetiza nada en ejecución ni necesita VOICEVOX. Cada frase lleva su traducción: lista completa en [`docs/FRASES_MIZU.md`](docs/FRASES_MIZU.md).
 
-La voz es **Piper** con **Daniela** (`es_AR-daniela-high`, femenina, calidad "high", español latinoamericano), neuronal y local: `voice/piperProvider.ts`. La primera vez descarga el modelo (~109 MB desde Hugging Face, en segundo plano al arrancar) y queda en la caché de la ventana; mientras no esté listo (o si el navegador bloquea el audio) habla la voz de Windows. Trocea por frases y la inferencia corre en un worker, así que la ventana y el personaje no se congelan: la primera frase suena en menos de 1 s. La boca se mueve con una pulsación por palabra.
+Habla (una frase al azar de su categoría, sin repetir la anterior) al arrancar, al decir «Mizu», al recibir una orden, mientras piensa y trabaja (según la herramienta), al empezar a responder, al pedir un permiso (según la acción), al terminar (normal, con problemas o tras una tarea larga), ante errores, al reaccionar a tests/compilación/git, al detenerla, si le hablas ocupada y, de vez en cuando, en reposo. Lógica en `voice/announcer.ts`; reproducción en `voice/jaVoice.ts`.
+
+**Subtítulo:** el texto japonés aparece letra a letra sobre su cabeza siguiendo el audio (`ui/caption.ts`), con la traducción al español debajo (ajuste). La boca se mueve con cada sílaba.
+
+**Ajustes** (menú): *Charla en reposo* (callada / poca / normal / mucha) y *Traducción del subtítulo*.
+
+**Cambiar o añadir frases:** edita `tools/voicevox/lines.mjs`, abre el motor de VOICEVOX (zip «voicevox_engine-windows-cpu» de github.com/VOICEVOX/voicevox_engine/releases, escucha en 127.0.0.1:50021) y ejecuta `node tools/voicevox/generate.mjs` y `node tools/voicevox/frases.mjs`. Hay que acreditar «VOICEVOX:四国めたん» si compartes la app.
+
+El motor español anterior (Piper con Daniela, voz de Windows de respaldo) sigue en el código y solo se usa para **leer respuestas** si se activa en Ajustes (por defecto apagado).
 
 #### Lectura de respuestas
 
