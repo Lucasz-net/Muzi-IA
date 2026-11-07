@@ -1,6 +1,9 @@
 mod agent;
 mod commands;
 mod mcp_desktop;
+mod mcp_memory;
+mod memory;
+mod tray;
 mod window;
 
 use tauri::Manager;
@@ -10,11 +13,21 @@ pub fn run_mcp_desktop() {
     mcp_desktop::run();
 }
 
+/// Modo servidor MCP de memoria (`mizu-ia --mcp-memory <archivo>`): también lo lanza Claude Code.
+pub fn run_mcp_memory(path: &std::path::Path) {
+    mcp_memory::run(path);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Una sola instancia: si se lanza otra (p. ej. al hacer doble clic con Mizu oculta), se muestra la que ya corre.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| tray::set_visible(app, true)))
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            tray::setup(app.handle())?;
+            tray::register_shortcut(app.handle())?;
             let config_path = app.path().app_config_dir()?.join("config.json");
             app.manage(commands::AgentState::load(config_path));
 
@@ -22,11 +35,14 @@ pub fn run() {
                 .get_webview_window("main")
                 .expect("ventana 'main' no encontrada");
             window::anchor_bottom_right(&win)?;
+            // La ventana nace invisible (tauri.conf.json) para que no parpadee si Mizu empieza oculta.
+            tray::set_visible(app.handle(), !tray::starts_hidden(app.handle()));
             window::spawn_cursor_tracker(win);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             window::set_click_through,
+            tray::set_window_visible,
             commands::agent_get_config,
             commands::agent_set_config,
             commands::agent_set_persona,
@@ -36,6 +52,9 @@ pub fn run() {
             commands::agent_stop,
             commands::agent_new_conversation,
             commands::quit_app,
+            commands::memory_list,
+            commands::memory_delete,
+            commands::memory_clear,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -14,25 +14,36 @@ use std::path::PathBuf;
 /// Personalidad de Mizu: charla casual y breve, sin tecnicismos (ver `src-tauri/persona/mizu.txt`).
 const MIZU_PERSONA: &str = include_str!("../../persona/mizu.txt");
 
-/// Escribe la configuración MCP que registra el control de escritorio y devuelve su ruta. El servidor es este mismo
-/// ejecutable con `--mcp-desktop` (ver `mcp_desktop.rs`): Claude Code lo lanza como proceso hijo por stdio.
-fn desktop_mcp_config() -> Result<PathBuf, String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+/// Escribe la configuración MCP y devuelve su ruta. Los servidores son este mismo ejecutable: `--mcp-desktop` (control del
+/// PC, ver `mcp_desktop.rs`) y `--mcp-memory <archivo>` (recuerdos, ver `mcp_memory.rs`). Claude Code los lanza por stdio.
+fn mcp_config(desktop: bool, memory: Option<&std::path::Path>) -> Result<PathBuf, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?.display().to_string();
     let dir = std::env::temp_dir().join("mizu-ia");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let path = dir.join("mcp-desktop.json");
-    let config = json!({ "mcpServers": { "mizu-desktop": { "command": exe.display().to_string(), "args": ["--mcp-desktop"] } } });
-    std::fs::write(&path, config.to_string()).map_err(|e| e.to_string())?;
+    let path = dir.join("mcp.json");
+    let mut servers = serde_json::Map::new();
+    if desktop {
+        servers.insert("mizu-desktop".into(), json!({ "command": exe, "args": ["--mcp-desktop"] }));
+    }
+    if let Some(mem) = memory {
+        servers.insert("mizu-memory".into(), json!({ "command": exe, "args": ["--mcp-memory", mem.display().to_string()] }));
+    }
+    std::fs::write(&path, json!({ "mcpServers": servers }).to_string()).map_err(|e| e.to_string())?;
     Ok(path)
 }
 
-/// Escribe la personalidad en un archivo temporal y devuelve su ruta. Se pasa con `--append-system-prompt-file` en vez
-/// de como argumento: en Windows `claude` es un `.cmd` y un texto largo con saltos de línea y símbolos se rompería.
-fn persona_file() -> Result<PathBuf, String> {
+/// Escribe lo que se añade al prompt del sistema (personalidad y/o memoria) en un archivo temporal y devuelve su ruta. Se
+/// pasa con `--append-system-prompt-file` en vez de como argumento: en Windows `claude` es un `.cmd` y un texto largo con
+/// saltos de línea y símbolos se rompería.
+fn system_prompt_file(mizu: bool, memory: Option<&std::path::Path>) -> Result<PathBuf, String> {
     let dir = std::env::temp_dir().join("mizu-ia");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join("persona-mizu.txt");
-    std::fs::write(&path, MIZU_PERSONA).map_err(|e| e.to_string())?;
+    let mut text = if mizu { MIZU_PERSONA.to_string() } else { String::new() };
+    if let Some(mem) = memory {
+        text.push_str(&crate::memory::prompt_block(mem));
+    }
+    std::fs::write(&path, text).map_err(|e| e.to_string())?;
     Ok(path)
 }
 
@@ -67,24 +78,28 @@ impl AgentAdapter for ClaudeCodeAdapter {
             args.push("--permission-mode".into());
             args.push(mode.into());
         }
-        // Por defecto habla como Mizu; con `persona: "claude"` se deja el estilo normal de Claude Code.
-        if cfg.persona.as_deref().unwrap_or("mizu") != "claude" {
-            match persona_file() {
+        // Por defecto habla como Mizu; con `persona: "claude"` se deja el estilo normal de Claude Code. La memoria
+        // (lo que Mizu sabe de la persona) se añade en ambos casos.
+        let mizu = cfg.persona.as_deref().unwrap_or("mizu") != "claude";
+        let memory = cfg.memory_path.as_deref();
+        if mizu || memory.is_some() {
+            match system_prompt_file(mizu, memory) {
                 Ok(path) => {
                     args.push("--append-system-prompt-file".into());
                     args.push(path.display().to_string());
                 }
-                Err(e) => eprintln!("[mizu] no se pudo preparar la personalidad: {e}"),
+                Err(e) => eprintln!("[mizu] no se pudo preparar el prompt: {e}"),
             }
         }
-        // Control del PC (activado por defecto). Cada acción sigue pasando por el flujo de permisos de la app.
-        if cfg.desktop.unwrap_or(true) {
-            match desktop_mcp_config() {
+        // Control del PC (activado por defecto) y memoria. Cada acción sigue pasando por el flujo de permisos de la app.
+        let desktop = cfg.desktop.unwrap_or(true);
+        if desktop || memory.is_some() {
+            match mcp_config(desktop, memory) {
                 Ok(path) => {
                     args.push("--mcp-config".into());
                     args.push(path.display().to_string());
                 }
-                Err(e) => eprintln!("[mizu] no se pudo preparar el control del PC: {e}"),
+                Err(e) => eprintln!("[mizu] no se pudo preparar el control del PC ni la memoria: {e}"),
             }
         }
         if let Some(id) = resume {

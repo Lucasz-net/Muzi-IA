@@ -240,8 +240,15 @@ export function createPiperTTS(fallback: TTSProvider): PiperTTS {
     [...open].forEach((j) => j.resolve());
   };
 
+  let volume = 1;
+  let master: GainNode | null = null;
   const ensureCtx = async () => {
-    ctx ??= new AudioContext({ sampleRate: cfg.audio.sample_rate });
+    if (!ctx) {
+      ctx = new AudioContext({ sampleRate: cfg.audio.sample_rate });
+      master = ctx.createGain();
+      master.gain.value = volume;
+      master.connect(ctx.destination);
+    }
     // Si el navegador bloquea el audio hasta que haya una interacción, no se espera en vano: habla el respaldo.
     if (ctx.state === "suspended") await Promise.race([ctx.resume(), new Promise((r) => setTimeout(r, 1200))]);
     if (ctx.state !== "running") throw new Error("el audio está bloqueado hasta que hagas clic en la ventana");
@@ -268,7 +275,7 @@ export function createPiperTTS(fallback: TTSProvider): PiperTTS {
       buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
       const src = audio.createBufferSource();
       src.buffer = buffer;
-      src.connect(audio.destination);
+      src.connect(master ?? audio.destination);
       const startAt = Math.max(nextStart, audio.currentTime + 0.02);
       src.start(startAt);
       nextStart = startAt + buffer.duration;
@@ -349,6 +356,11 @@ export function createPiperTTS(fallback: TTSProvider): PiperTTS {
     },
     lastTimings,
     preload,
+    setVolume(v: number) {
+      volume = Math.min(1, Math.max(0, v));
+      if (master) master.gain.value = volume;
+      fallback.setVolume?.(volume);
+    },
     async speak(text, opts = {}) {
       if (!text.trim()) return;
       if (!ready) return useFallback() ? fallback.speak(text, opts) : undefined;

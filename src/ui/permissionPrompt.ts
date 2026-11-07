@@ -78,6 +78,9 @@ function describe(tool: string, raw: unknown, description?: string | null) {
  * Solicitudes de permiso con botones Rechazar / Siempre / Aceptar (en cola si hay varias). "Siempre" recuerda una
  * regla estrecha (ver `core/permissionRules.ts`) y deja de preguntar lo mismo; solo se ofrece si es seguro.
  */
+/** Herramientas del servidor de memoria de Mizu (`mcp_memory.rs`): se aprueban solas. */
+const MEMORY_TOOLS = new Set(["mcp__mizu-memory__remember", "mcp__mizu-memory__forget"]);
+
 export function createPermissionPrompt(parent: HTMLElement, rules: RuleStore) {
   const root = el("div", { class: "permissions" });
   parent.append(root);
@@ -94,6 +97,11 @@ export function createPermissionPrompt(parent: HTMLElement, rules: RuleStore) {
     /** Si una regla recordada cubre la petición, la aprueba sin preguntar y devuelve true. */
     tryAutoAllow(ev: AgentEvent): boolean {
       if (ev.type !== "waiting_permission") return false;
+      // Guardar u olvidar un recuerdo es inocuo (notas cortas, sin datos sensibles) y se puede revisar en Ajustes: no se pregunta.
+      if (MEMORY_TOOLS.has(ev.tool_name)) {
+        agent.respondPermission(ev.request_id, true).catch(console.error);
+        return true;
+      }
       const rule = rules.find(ev.tool_name, ev.input);
       if (!rule) return false;
       agent.respondPermission(ev.request_id, true).catch(console.error);

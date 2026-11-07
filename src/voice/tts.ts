@@ -27,6 +27,8 @@ export interface TTSProvider {
    */
   enqueue?(text: string, opts?: SpeakOptions): Promise<void>;
   cancel(): void;
+  /** Volumen propio de Mizu, de 0 a 1 (además del volumen de Windows). */
+  setVolume?(volume: number): void;
   onSpeakingChange(cb: (speaking: boolean) => void): () => void;
   /** Avance del habla por palabras (si el motor lo soporta): útil para el lipsync. */
   onBoundary(cb: (charIndex: number, text: string) => void): () => void;

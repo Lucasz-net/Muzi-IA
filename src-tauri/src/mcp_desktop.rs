@@ -35,7 +35,7 @@ struct Desktop {
 
 type ToolResult = Result<Value, String>;
 
-fn text(t: impl Into<String>) -> Value {
+pub(crate) fn text(t: impl Into<String>) -> Value {
     json!({ "type": "text", "text": t.into() })
 }
 fn ok(t: impl Into<String>) -> ToolResult {
@@ -375,11 +375,11 @@ const TOOLS: &str = r#"[
  {"name":"wait","description":"Espera unos milisegundos (máximo 10000), por ejemplo mientras abre un programa.","inputSchema":{"type":"object","properties":{"ms":{"type":"integer"}},"required":["ms"]}}
 ]"#;
 
-fn reply(out: &mut impl Write, id: &Value, result: Value) {
+pub(crate) fn reply(out: &mut impl Write, id: &Value, result: Value) {
     let _ = writeln!(out, "{}", json!({ "jsonrpc": "2.0", "id": id, "result": result }));
     let _ = out.flush();
 }
-fn reply_error(out: &mut impl Write, id: &Value, code: i32, message: &str) {
+pub(crate) fn reply_error(out: &mut impl Write, id: &Value, code: i32, message: &str) {
     let _ = writeln!(out, "{}", json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } }));
     let _ = out.flush();
 }

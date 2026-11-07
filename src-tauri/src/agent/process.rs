@@ -8,7 +8,7 @@ use std::{
     path::PathBuf,
     process::{ChildStdin, Command, Stdio},
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
     thread,
@@ -20,6 +20,17 @@ pub const EVENT_CHANNEL: &str = "agent-event";
 
 pub type SessionSlot = Arc<Mutex<Option<AgentSession>>>;
 
+/// Segundos sin ninguna salida del CLI, con un turno en marcha y sin permisos pendientes, tras los cuales
+/// se da por colgado. Es generoso a propósito: una compilación o unos tests largos pueden callar mucho rato.
+const HANG_SECS: u64 = 15 * 60;
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
 pub struct AgentSession {
     pub generation: u64,
     pid: u32,
@@ -28,11 +39,17 @@ pub struct AgentSession {
     pending: Arc<Mutex<HashMap<String, Value>>>,
     stopped: Arc<AtomicBool>,
     adapter: Arc<dyn AgentAdapter>,
+    /// Hay un turno en marcha (se envió un mensaje y aún no llegó Done/Error/Idle).
+    turn_active: Arc<AtomicBool>,
+    /// Última vez (segundos desde la época) que el CLI escribió algo.
+    last_activity: Arc<AtomicU64>,
 }
 
 impl AgentSession {
     pub fn send_user_message(&mut self, text: &str) -> Result<(), String> {
         let line = self.adapter.encode_user_message(text);
+        self.last_activity.store(now_secs(), Ordering::SeqCst);
+        self.turn_active.store(true, Ordering::SeqCst);
         self.write_line(&line)
     }
 
@@ -111,6 +128,32 @@ pub fn spawn(
     let pending: Arc<Mutex<HashMap<String, Value>>> = Arc::default();
     let stopped = Arc::new(AtomicBool::new(false));
     let stderr_tail: Arc<Mutex<String>> = Arc::default();
+    let turn_active = Arc::new(AtomicBool::new(false));
+    let last_activity = Arc::new(AtomicU64::new(now_secs()));
+    // Si el vigilante mata el CLI, aquí deja el motivo para que el lector lo cuente en vez de un "se cerró".
+    let exit_reason: Arc<Mutex<Option<String>>> = Arc::default();
+    let finished = Arc::new(AtomicBool::new(false));
+
+    // Vigilante: un CLI que no escribe nada durante mucho rato en pleno turno está colgado.
+    {
+        let (turn_active, last_activity, pending, exit_reason, finished) =
+            (turn_active.clone(), last_activity.clone(), pending.clone(), exit_reason.clone(), finished.clone());
+        thread::spawn(move || {
+            while !finished.load(Ordering::SeqCst) {
+                thread::sleep(std::time::Duration::from_secs(30));
+                let silent = now_secs().saturating_sub(last_activity.load(Ordering::SeqCst));
+                let waiting_user = !pending.lock().unwrap().is_empty();
+                if turn_active.load(Ordering::SeqCst) && !waiting_user && silent >= HANG_SECS {
+                    *exit_reason.lock().unwrap() = Some(format!(
+                        "Claude lleva {} minutos sin dar señales, así que lo he reiniciado. Pídemelo otra vez y sigo con la conversación.",
+                        silent / 60
+                    ));
+                    kill_tree(pid);
+                    return;
+                }
+            }
+        });
+    }
 
     // stderr: se guarda la cola para dar contexto si el proceso muere.
     {
@@ -137,6 +180,8 @@ pub fn spawn(
         let adapter = adapter.clone();
         let pending = pending.clone();
         let stopped = stopped.clone();
+        let (turn_active, last_activity, exit_reason, finished) =
+            (turn_active.clone(), last_activity.clone(), exit_reason.clone(), finished.clone());
         thread::spawn(move || {
             let mut parser = adapter.new_parser();
             for raw in BufReader::new(stdout).split(b'\n').map_while(Result::ok) {
@@ -144,7 +189,15 @@ pub fn spawn(
                 if line.trim().is_empty() {
                     continue;
                 }
-                for ev in parser.parse_line(&line) {
+                last_activity.store(now_secs(), Ordering::SeqCst);
+                for mut ev in parser.parse_line(&line) {
+                    if let AgentEvent::Error { message } = &mut ev {
+                        eprintln!("[agent error] {message}");
+                        *message = super::errors::explain(message);
+                    }
+                    if matches!(ev, AgentEvent::Done { .. } | AgentEvent::Error { .. } | AgentEvent::Idle) {
+                        turn_active.store(false, Ordering::SeqCst);
+                    }
                     match &ev {
                         AgentEvent::WaitingPermission { request_id, input, .. } => {
                             pending.lock().unwrap().insert(request_id.clone(), input.clone());
@@ -159,6 +212,8 @@ pub fn spawn(
             }
 
             let status = child.wait();
+            finished.store(true, Ordering::SeqCst);
+            turn_active.store(false, Ordering::SeqCst);
             {
                 let mut s = slot.lock().unwrap();
                 if s.as_ref().is_some_and(|sess| sess.generation == generation) {
@@ -167,13 +222,22 @@ pub fn spawn(
             }
             let ev = if stopped.load(Ordering::SeqCst) {
                 AgentEvent::Idle
+            } else if let Some(message) = exit_reason.lock().unwrap().take() {
+                AgentEvent::Error { message }
             } else {
                 let tail = stderr_tail.lock().unwrap().trim().to_string();
                 let code = status.ok().and_then(|s| s.code());
                 let message = match (code, tail.is_empty()) {
-                    (_, false) => format!("El CLI se cerró inesperadamente: {tail}"),
-                    (Some(c), true) => format!("El CLI se cerró inesperadamente (código {c})"),
-                    (None, true) => "El CLI se cerró inesperadamente".to_string(),
+                    (_, false) => {
+                        let explained = super::errors::explain(&tail);
+                        if explained == tail {
+                            format!("Claude se cerró de golpe: {tail}. Escríbeme otra vez y retomo la conversación.")
+                        } else {
+                            explained
+                        }
+                    }
+                    (Some(c), true) => format!("Claude se cerró de golpe (código {c}). Escríbeme otra vez y retomo la conversación."),
+                    (None, true) => "Claude se cerró de golpe. Escríbeme otra vez y retomo la conversación.".to_string(),
                 };
                 AgentEvent::Error { message }
             };
@@ -181,7 +245,7 @@ pub fn spawn(
         });
     }
 
-    Ok(AgentSession { generation, pid, stdin, pending, stopped, adapter })
+    Ok(AgentSession { generation, pid, stdin, pending, stopped, adapter, turn_active, last_activity })
 }
 
 #[cfg(windows)]

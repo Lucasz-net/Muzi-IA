@@ -71,6 +71,29 @@ fn view(app: &AppHandle, cfg: AgentConfig) -> ConfigView {
     ConfigView { config: cfg, effective_cwd }
 }
 
+/// Archivo de recuerdos de Mizu (junto a config.json).
+fn memory_file(app: &AppHandle) -> Option<PathBuf> {
+    app.path().app_config_dir().ok().map(|d| crate::memory::path_in(&d))
+}
+
+#[tauri::command]
+pub fn memory_list(app: AppHandle) -> Vec<crate::memory::Note> {
+    memory_file(&app).map(|p| crate::memory::load(&p)).unwrap_or_default()
+}
+
+/// Borra un recuerdo. Se aplica a las conversaciones nuevas: la actual ya lo tiene en su contexto.
+#[tauri::command]
+pub fn memory_delete(app: AppHandle, id: String) -> Result<(), String> {
+    let path = memory_file(&app).ok_or("No hay carpeta de configuración")?;
+    crate::memory::remove(&path, &id)
+}
+
+#[tauri::command]
+pub fn memory_clear(app: AppHandle) -> Result<(), String> {
+    let path = memory_file(&app).ok_or("No hay carpeta de configuración")?;
+    crate::memory::clear(&path)
+}
+
 #[tauri::command]
 pub fn agent_get_config(app: AppHandle, state: State<AgentState>) -> ConfigView {
     view(&app, state.config.lock().unwrap().clone())
@@ -132,33 +155,42 @@ pub fn agent_set_desktop(
 #[tauri::command]
 pub fn agent_send(app: AppHandle, state: State<AgentState>, text: String) -> Result<(), String> {
     let mut slot = state.session.lock().unwrap();
-    if slot.is_none() {
-        let cfg = state.config.lock().unwrap().clone();
-        let adapter = agent::adapter_for(&cfg.adapter)
-            .ok_or_else(|| format!("Adaptador desconocido: {}", cfg.adapter))?;
-        let home = app.path().home_dir().map_err(|e| e.to_string())?;
-        let generation = state.next_generation.fetch_add(1, Ordering::SeqCst);
-        let resume = state.last_session_id.lock().unwrap().clone();
-        let session = process::spawn(
-            &app,
-            adapter,
-            &cfg,
-            home,
-            resume,
-            generation,
-            state.session.clone(),
-            state.last_session_id.clone(),
-        )?;
-        *slot = Some(session);
-    }
-    let result = slot.as_mut().unwrap().send_user_message(&text);
-    if result.is_err() {
-        // Pipe roto: descarta la sesión para que el próximo intento relance el CLI.
-        if let Some(s) = slot.take() {
-            s.kill();
+    // Dos intentos: si la sesión existente tiene la tubería rota (el CLI murió sin que nos enteráramos),
+    // se descarta y se relanza una vez retomando la conversación, sin que el usuario tenga que repetir nada.
+    let mut last_err = String::new();
+    for _ in 0..2 {
+        if slot.is_none() {
+            let mut cfg = state.config.lock().unwrap().clone();
+            cfg.memory_path = memory_file(&app);
+            let adapter = agent::adapter_for(&cfg.adapter)
+                .ok_or_else(|| format!("Adaptador desconocido: {}", cfg.adapter))?;
+            let home = app.path().home_dir().map_err(|e| e.to_string())?;
+            let generation = state.next_generation.fetch_add(1, Ordering::SeqCst);
+            let resume = state.last_session_id.lock().unwrap().clone();
+            let session = process::spawn(
+                &app,
+                adapter,
+                &cfg,
+                home,
+                resume,
+                generation,
+                state.session.clone(),
+                state.last_session_id.clone(),
+            )
+            .map_err(|e| agent::errors::explain(&e))?;
+            *slot = Some(session);
+        }
+        match slot.as_mut().unwrap().send_user_message(&text) {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                last_err = e;
+                if let Some(s) = slot.take() {
+                    s.kill();
+                }
+            }
         }
     }
-    result
+    Err(agent::errors::explain(&last_err))
 }
 
 #[tauri::command]

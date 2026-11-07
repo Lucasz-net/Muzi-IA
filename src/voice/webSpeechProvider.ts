@@ -13,6 +13,7 @@ export class WebSpeechProvider implements TTSProvider {
   readonly id = "web-speech";
   readonly available = typeof window !== "undefined" && "speechSynthesis" in window;
   speaking = false;
+  private volume = 1;
 
   private voice: SpeechSynthesisVoice | null = null;
   private speakingCbs = new Set<(s: boolean) => void>();
@@ -61,6 +62,7 @@ export class WebSpeechProvider implements TTSProvider {
       if (this.voice) u.voice = this.voice;
       u.lang = this.voice?.lang ?? this.lang;
       const mood = MOOD_VOICE[opts.mood ?? "neutral"];
+      u.volume = this.volume;
       u.rate = opts.rate ?? mood.rate;
       u.pitch = opts.pitch ?? mood.pitch;
       u.onstart = () => this.setSpeaking(true);
@@ -73,6 +75,10 @@ export class WebSpeechProvider implements TTSProvider {
       u.onerror = finish; // incluye "canceled" al cortar con cancel()
       speechSynthesis.speak(u);
     });
+  }
+
+  setVolume(volume: number) {
+    this.volume = Math.min(1, Math.max(0, volume));
   }
 
   cancel() {

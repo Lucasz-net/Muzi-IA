@@ -7,6 +7,7 @@
 //! El resto de la app (proceso hijo, eventos de Tauri, frontend) no cambia.
 
 pub mod claude_code;
+pub mod errors;
 pub mod process;
 
 use serde::{Deserialize, Serialize};
@@ -58,6 +59,9 @@ pub struct AgentConfig {
     pub persona: Option<String>,
     /// Control del PC (ver y manejar ratón y teclado con el servidor MCP propio). `None` = activado.
     pub desktop: Option<bool>,
+    /// Archivo de recuerdos de Mizu. No se guarda en config.json: lo rellena la app al lanzar el CLI.
+    #[serde(skip)]
+    pub memory_path: Option<PathBuf>,
 }
 
 impl Default for AgentConfig {
@@ -69,6 +73,7 @@ impl Default for AgentConfig {
             permission_mode: None,
             persona: None,
             desktop: None,
+            memory_path: None,
         }
     }
 }

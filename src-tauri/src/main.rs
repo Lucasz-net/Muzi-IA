@@ -7,5 +7,13 @@ fn main() {
         mizu_ia_lib::run_mcp_desktop();
         return;
     }
+    // ...y con `--mcp-memory <archivo>` como servidor MCP de memoria.
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(i) = args.iter().position(|a| a == "--mcp-memory") {
+        if let Some(path) = args.get(i + 1) {
+            mizu_ia_lib::run_mcp_memory(std::path::Path::new(path));
+            return;
+        }
+    }
     mizu_ia_lib::run()
 }

@@ -12,6 +12,21 @@ export const cursor = {
 /** Control de la aplicación (cierre). */
 export const app = {
   quit: () => invoke<void>("quit_app"),
+  /** Muestra u oculta la ventana (Mizu sigue trabajando oculta; se controla también desde la bandeja). */
+  setVisible: (visible: boolean) => invoke<void>("set_window_visible", { visible }),
+};
+
+/** Un recuerdo de Mizu sobre la persona (ver `memory.rs`). */
+export interface MemoryNote {
+  id: string;
+  text: string;
+  created: number;
+}
+
+export const memory = {
+  list: () => invoke<MemoryNote[]>("memory_list"),
+  remove: (id: string) => invoke<void>("memory_delete", { id }),
+  clear: () => invoke<void>("memory_clear"),
 };
 
 /** Puente tipado con el backend. Toda la comunicación con Rust pasa por aquí. */
