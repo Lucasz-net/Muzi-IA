@@ -20,10 +20,17 @@ export interface ArmGesture {
   roll: number;
   elbow: number;
   twist?: number;
+  /** Giro del brazo entero sobre su propio eje (hombro): orienta hacia dónde dobla el codo (+ = el antebrazo se cierra hacia el pecho). */
+  uTwist?: number;
   wrist?: Euler3;
   fingers?: FingerSpec;
-  /** Cuánto se impone el gesto sobre lo que esté haciendo el brazo (0..1). */
+  /** Cuánto se impone el gesto sobre lo que esté haciendo el brazo (0..1). Es el peso del brazo; el máximo de todos. */
   w: number;
+  /** Pesos propios del antebrazo, la mano, los dedos y el pulgar (por defecto, `w`): así cada articulación llega con su retardo. */
+  we?: number;
+  wh?: number;
+  wf?: number;
+  wt?: number;
 }
 
 /** Ajustes aditivos del torso. */
@@ -94,6 +101,37 @@ const chain = (start: number, steps: [number, number][]) => {
   return value;
 };
 
+/** Subida que arranca decidida y se frena al llegar (menos mecánica que una S simétrica). */
+const rise = (x: number) => {
+  const c = Math.min(1, Math.max(0, x));
+  return 0.35 * smooth(c) + 0.65 * (1 - (1 - c) ** 3);
+};
+const fall = (x: number) => smooth(Math.min(1, Math.max(0, x)));
+
+/** Pesos de un brazo con todas sus articulaciones en cascada. */
+interface Limb {
+  w: number;
+  we: number;
+  wh: number;
+  wf: number;
+  wt: number;
+}
+/**
+ * Un brazo que sube en `up` s, se mantiene `hold` s y baja en `down` s, con cada articulación
+ * desfasada: al subir va primero el brazo, luego el codo, la muñeca, los dedos y por último el
+ * pulgar; al bajar se sueltan primero los dedos y el brazo cae el último (por eso un gesto dura
+ * ~0,4 s más que `up + hold + down`).
+ */
+function limb(t: number, up: number, hold: number, down: number): Limb {
+  const tf = up + hold;
+  const part = (rs: number, fs: number) => rise((t - rs) / up) * (1 - fall((t - tf - fs) / down));
+  return { w: part(0, 0.26), we: part(0.07, 0.18), wh: part(0.14, 0.12), wf: part(0.22, 0.05), wt: part(0.32, 0) };
+}
+/** Deriva lenta y irregular en [-1, 1]: lo que mueve un brazo que se mantiene en el aire sin estar congelado. */
+const drift = (t: number, seed: number) => Math.sin(t * 1.7 + seed * 3.1) * 0.6 + Math.sin(t * 2.9 + seed * 7.3) * 0.4;
+/** Pequeño rebote amortiguado tras llegar a la pose (en el instante `ta`). */
+const settle = (t: number, ta: number) => (t < ta ? 0 : Math.exp(-4.5 * (t - ta)) * Math.sin(11 * (t - ta)));
+
 const wink = (t: number, side: number): Result => {
   const closed = env(t, 0.1, 0.32, 0.16);
   return {
@@ -114,19 +152,19 @@ const FIST: FingerSpec = {
   LittleProximal: [0, 0, 1.5], LittleIntermediate: [0, 0, 1.6], LittleDistal: [0, 0, 1.0],
 };
 /**
- * Corazón coreano: el índice, algo flexionado, y el pulgar se cruzan en X por la mitad de sus
- * tramos finales (como en la imagen de referencia), y el resto de dedos van cerrados. Los ángulos
- * salen de una búsqueda numérica sobre este modelo (cruce a 0,1 mm, tramos a ~60°) y se revisaron a
- * ojo; la mano y el antebrazo, que la dejan erguida junto a la mejilla con el índice inclinado, van
- * en el gesto (`fingerHeart`). Con otro VRM puede hacer falta reajustarlos.
+ * Corazón coreano: el índice, en gancho, y el pulgar, casi recto hacia arriba, se cruzan en X por la
+ * mitad de sus últimos tramos (~90° entre ellos), y el resto de dedos van cerrados. Los ángulos
+ * salen de una búsqueda numérica sobre este modelo (cruce a 1 mm, mano con los dedos hacia arriba) y
+ * se revisaron mirando la mano de cerca; la muñeca y el antebrazo van en el gesto (`fingerHeart`).
+ * Con otro VRM los ejes del pulgar cambian y hay que repetir la búsqueda.
  */
 const FINGER_HEART: FingerSpec = {
   // Los tres dedos cerrados en escalera (el corazón algo menos que el meñique): menos tensos que un puño.
   MiddleProximal: [0, 0, 1.3], MiddleIntermediate: [0, 0, 1.5], MiddleDistal: [0, 0, 0.9],
   RingProximal: [0, 0, 1.4], RingIntermediate: [0, 0, 1.55], RingDistal: [0, 0, 0.95],
   LittleProximal: [0, 0, 1.5], LittleIntermediate: [0, 0, 1.6], LittleDistal: [0, 0, 1.0],
-  IndexProximal: [0, 0, 0.991], IndexIntermediate: [0, 0, 0.91], IndexDistal: [0, 0, 0.003],
-  ThumbMetacarpal: [-1.716, -0.998, 0.134], ThumbProximal: [0.394, -0.779, -0.62], ThumbDistal: [0.016, -0.055, 0.003],
+  IndexProximal: [0, 0, 0.35], IndexIntermediate: [0, 0, 1.887], IndexDistal: [0, 0, 1.362],
+  ThumbMetacarpal: [-1.865, -0.945, 0.107], ThumbProximal: [-0.037, 0.014, -0.385], ThumbDistal: [-0.713, -0.372, -0.914],
 };
 /** Signo de la paz: índice y corazón estirados y separados. */
 const PEACE: FingerSpec = {
@@ -178,6 +216,10 @@ function stretchArm(t0: number, lag: number, reachRoll: number, fwd: number): Ar
     twist: chain(0, [[rise, -0.5], [reach, -0.85], [soften, -0.3], [drop, 0]]),
     wrist: [0, 0, -0.3 * up],
     fingers: STRETCH_HAND,
+    // La muñeca y los dedos llegan un poco más tarde y se sueltan antes que el brazo.
+    we: env(t0 - 0.06, 0.2, 5.0, 0.3),
+    wh: env(t0 - 0.14, 0.3, 4.8, 0.3),
+    wf: env(t0 - 0.24, 0.5, 4.5, 0.4),
   });
 }
 
@@ -323,53 +365,97 @@ const DEFS: Record<string, Def> = {
   },
   /** Corazón coreano con los dedos junto a la cara, con un guiño. */
   fingerHeart: {
-    duration: 4.2,
+    duration: 5,
     at: (t, side) => {
-      const k = env(t, 0.7, 2.4, 0.7);
-      const pop = env(t - 1.0, 0.25, 0.3, 0.4); // el corazón sale: un pequeño cabeceo de alegría
-      const sway = Math.sin(t * 2.6) * k; // la mano flota un poco, no queda congelada
+      // La cabeza y la sonrisa se adelantan; el brazo sale un instante después y llega con un pequeño rebote.
+      const L = limb(t - 0.2, 0.75, 2.2, 0.85);
+      const k = L.w;
+      const bounce = settle(t, 0.95);
+      const pop = env(t - 1.45, 0.22, 0.3, 0.45); // el corazón sale: un pequeño cabeceo de alegría
+      const [d1, d2, d3] = [drift(t, 1) * k, drift(t, 2) * k, drift(t, 3) * k]; // la mano flota, no queda congelada
       return {
         exp: {
-          happy: 0.55 * env(t - 0.3, 0.5, 2, 0.7),
-          [side > 0 ? "blinkRight" : "blinkLeft"]: env(t - 1.6, 0.1, 0.35, 0.15),
+          happy: 0.55 * env(t - 0.3, 0.6, 2.2, 0.9),
+          [side > 0 ? "blinkRight" : "blinkLeft"]: env(t - 1.9, 0.1, 0.35, 0.18),
         },
-        head: { roll: side * -0.09 * k, pitch: -0.03 * pop },
-        pose: { bodyY: 0.006 * pop },
-        look: { x: 0, y: 0, w: k },
+        head: { roll: side * -0.09 * env(t - 0.05, 0.8, 2.4, 0.9) + 0.012 * d2, pitch: -0.03 * pop + 0.015 * d1 },
+        pose: { bodyY: 0.006 * pop, shoulders: 0.035 * k, lean: -0.012 * env(t, 0.25, 0.4, 0.5), sway: side * 0.01 * d3 },
+        look: { x: 0, y: 0, w: env(t, 0.6, 2.4, 0.9) },
         arm: arm(k, {
-          pitch: 0.915 + 0.025 * sway,
-          roll: 0.1 + 0.02 * Math.sin(t * 2.1 + 1) * k,
-          elbow: 1.99 + 0.03 * sway,
-          twist: -0.148,
-          wrist: [-0.084, 0.036, -0.665 + 0.05 * sway],
+          // El codo sale hacia fuera y el antebrazo cruza el pecho en diagonal: la mano queda en el centro del pecho
+          // (y la manga no la tapa). Valores hallados midiendo la posición de la mano respecto al pecho.
+          pitch: -0.21 + 0.05 * bounce + 0.025 * d1,
+          roll: 0.92 + 0.02 * d2,
+          uTwist: 0.84,
+          elbow: 1.66 + 0.08 * bounce + 0.03 * d3,
+          twist: 0,
+          wrist: [0.6 + 0.03 * d2, 0.036, -1.6 + 0.05 * d1],
           fingers: FINGER_HEART,
+          we: L.we,
+          wh: L.wh,
+          wf: L.wf,
+          wt: L.wt,
         }),
-        heart: env(t - 1.0, 0.3, 1.5, 0.35),
+        heart: env(t - 1.45, 0.3, 1.4, 0.4),
       };
     },
   },
   /** Signo de la paz junto a la cara. */
   peace: {
-    duration: 3.4,
+    duration: 4.2,
     at: (t, side) => {
-      const k = env(t, 0.6, 1.9, 0.6);
+      const L = limb(t - 0.15, 0.65, 1.9, 0.75);
+      const k = L.w;
+      const bounce = settle(t, 0.8);
+      const [d1, d2, d3] = [drift(t, 4) * k, drift(t, 5) * k, drift(t, 6) * k];
+      // Un balanceo suave de la V, como quien la enseña a una cámara.
+      const wave = Math.sin(t * 3.1) * k * env(t - 1.0, 0.4, 1.2, 0.5);
       return {
-        exp: { happy: 0.6 * k },
-        head: { roll: side * -0.1 * k },
-        look: { x: 0, y: 0, w: k },
-        arm: arm(k, { pitch: 0.85, roll: 0.4, elbow: 2.05, twist: -1.2, fingers: PEACE }),
+        exp: { happy: 0.6 * env(t - 0.2, 0.6, 2, 0.8) },
+        head: { roll: side * -0.1 * env(t - 0.05, 0.7, 2.1, 0.8) + 0.01 * d2, pitch: 0.012 * d1 },
+        pose: { shoulders: 0.03 * k, bodyY: 0.004 * Math.max(0, bounce) },
+        look: { x: 0, y: 0, w: env(t, 0.55, 2.1, 0.8) },
+        arm: arm(k, {
+          pitch: 0.85 + 0.05 * bounce + 0.02 * d1,
+          roll: 0.4 + 0.02 * d2,
+          elbow: 2.05 + 0.07 * bounce + 0.03 * d3,
+          twist: -1.2,
+          wrist: [0, 0.04 * wave, 0.06 * wave],
+          fingers: PEACE,
+          we: L.we,
+          wh: L.wh,
+          wf: L.wf,
+          wt: L.wt,
+        }),
       };
     },
   },
   /** Pulgar arriba. */
   thumbsUp: {
-    duration: 3,
+    duration: 3.8,
     at: (t) => {
-      const k = env(t, 0.55, 1.7, 0.6);
+      const L = limb(t - 0.1, 0.6, 1.7, 0.7);
+      const k = L.w;
+      const bounce = settle(t, 0.7);
+      const [d1, d2] = [drift(t, 8) * k, drift(t, 9) * k];
+      // Dos cabeceos pequeños de "vale", con el pulgar acompañando.
+      const nod = Math.sin((t - 1.0) * 7) * env(t - 1.0, 0.1, 0.45, 0.25);
       return {
-        exp: { happy: 0.5 * k },
-        look: { x: 0, y: 0, w: k },
-        arm: arm(k, { pitch: 0.9, roll: 0.3, elbow: 1.35, fingers: THUMBS_UP }),
+        exp: { happy: 0.5 * env(t - 0.2, 0.55, 1.9, 0.7) },
+        head: { pitch: 0.05 * nod },
+        pose: { shoulders: 0.025 * k },
+        look: { x: 0, y: 0, w: env(t, 0.5, 1.9, 0.7) },
+        arm: arm(k, {
+          pitch: 0.9 + 0.05 * bounce + 0.02 * d1 + 0.03 * nod,
+          roll: 0.3 + 0.02 * d2,
+          elbow: 1.35 + 0.08 * bounce + 0.03 * nod,
+          wrist: [0.05 * nod, 0, 0],
+          fingers: THUMBS_UP,
+          we: L.we,
+          wh: L.wh,
+          wf: L.wf,
+          wt: L.wt,
+        }),
       };
     },
   },
@@ -379,24 +465,35 @@ const DEFS: Record<string, Def> = {
    * "amasan" a contratiempo, uno sube mientras el otro baja, como un gatito.
    */
   catPaws: {
-    duration: 3.8,
+    duration: 4.4,
     at: (t, side) => {
-      const k = env(t, 0.55, 2.5, 0.6);
-      const paw = Math.sin(t * 7) * k;
-      const make = (phase: number) =>
-        arm(k, {
-          pitch: 0.95 + 0.04 * phase,
-          roll: 0.5,
-          elbow: 2.0 + 0.14 * phase,
+      const L = limb(t - 0.1, 0.6, 2.5, 0.7);
+      const L2 = limb(t - 0.2, 0.6, 2.4, 0.75); // la segunda pata llega un poco después
+      const k = L.w;
+      const bounce = settle(t, 0.7);
+      // El amasado arranca suave y sube de ritmo; cada pata con su propio compás.
+      const kneadIn = env(t - 0.9, 0.5, 1.9, 0.5);
+      const paw = Math.sin(t * 6.4) * kneadIn;
+      const paw2 = Math.sin(t * 6.4 + Math.PI + 0.3) * kneadIn;
+      const make = (l: Limb, phase: number, seed: number) =>
+        arm(l.w, {
+          pitch: 0.95 + 0.04 * phase + 0.04 * bounce,
+          roll: 0.5 + 0.02 * drift(t, seed) * l.w,
+          elbow: 2.0 + 0.14 * phase + 0.06 * bounce,
           twist: -0.5,
           wrist: [0.2, 0, 0.6 + 0.2 * phase],
           fingers: PAW,
+          we: l.we,
+          wh: l.wh,
+          wf: l.wf,
+          wt: l.wt,
         });
       return {
-        exp: { happy: 0.6 * k },
-        head: { roll: side * 0.1 * k, pitch: 0.04 * k },
-        arm: make(paw),
-        other: make(-paw),
+        exp: { happy: 0.6 * env(t - 0.2, 0.6, 2.7, 0.8) },
+        head: { roll: side * 0.1 * k + 0.012 * drift(t, 11) * k, pitch: 0.04 * k + 0.02 * paw },
+        pose: { shoulders: 0.03 * k },
+        arm: make(L, paw, 12),
+        other: make(L2, paw2, 13),
       };
     },
   },
@@ -463,6 +560,12 @@ export class Gestures {
       frame.head.pitch += r.head?.pitch ?? 0;
       frame.head.yaw += r.head?.yaw ?? 0;
       frame.head.roll += r.head?.roll ?? 0;
+      // Vida propia: mientras dura el gesto la cabeza y el torso se mueven un poco por su cuenta (más en el centro del gesto).
+      const live = Math.sin((Math.PI * a.t) / a.def.duration);
+      frame.head.yaw += 0.018 * drift(a.t, 21) * live;
+      frame.head.pitch += 0.012 * drift(a.t, 22) * live;
+      frame.pose.sway += 0.012 * drift(a.t, 23) * live;
+      frame.pose.breath += 0.004 * (drift(a.t * 1.3, 24) + 1) * live;
       for (const [k, v] of Object.entries(r.pose ?? {})) frame.pose[k as keyof PoseOffset] += v ?? 0;
       if (r.look && r.look.w > frame.look.w) frame.look = r.look;
       // Un brazo va al lado que tocó (izquierda si side > 0); si pide los dos, a ambos.

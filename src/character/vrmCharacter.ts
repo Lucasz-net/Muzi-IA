@@ -71,6 +71,8 @@ const HEADROOM_RATIO = 0.3;
 
 /** Cuánto de la rotación de cabeza se reparte entre cuello y cabeza. */
 const NECK_SHARE = 0.4;
+/** Separación (rad) que se da al brazo que cuelga bajo un clip para que la manga no atraviese el cuerpo. */
+const SLEEVE_SPREAD = 0.32;
 const HEAD_SHARE = 0.6;
 /** Radianes de giro de cabeza por unidad de mirada normalizada. */
 const GAZE_HEAD_YAW = 0.45;
@@ -155,11 +157,20 @@ class VrmCharacter implements Character {
   private readonly bone: (name: VRMHumanBoneName) => THREE.Object3D | null;
   /** +1 si el brazo apunta hacia +X en T-pose, -1 si hacia -X (depende del modelo). */
   private readonly armDir: { left: number; right: number };
+  /**
+   * +1 si el frente del personaje es el +Z local de sus huesos, -1 si es el -Z (VRM 0.x: `rotateVRM0`
+   * gira la escena media vuelta y los ejes X y Z locales quedan invertidos respecto al mundo). Las
+   * poses se escriben para +1; con -1 se invierten los giros sobre X ("hacia delante") y los del codo.
+   */
+  private readonly fwd: number;
   private readonly headPos = new THREE.Vector3();
   private readonly headCenter = new THREE.Vector3();
   private readonly headLift = new THREE.Vector3(0, 0.08, 0);
   private readonly e = new THREE.Euler();
   private readonly qGaze = new THREE.Quaternion();
+  private lastClipFile: string | null = null;
+  private readonly qSleeve = new THREE.Quaternion();
+  private readonly vSleeve = new THREE.Vector3();
 
   constructor(private readonly vrm: VRM) {
     this.root.add(vrm.scene, this.indicators.root, this.heart.root);
@@ -191,6 +202,10 @@ class VrmCharacter implements Character {
       const h = armNode.parent.worldToLocal(handNode.getWorldPosition(new THREE.Vector3()));
       return h.x < a.x ? -1 : 1;
     };
+    const front = new THREE.Vector3(0, 0, 1);
+    const spine = this.bone("spine");
+    if (spine?.parent) front.transformDirection(spine.parent.matrixWorld.clone().invert());
+    this.fwd = front.z < 0 ? -1 : 1;
     this.armDir = {
       left: side("leftUpperArm", "leftHand"),
       right: side("rightUpperArm", "rightHand"),
@@ -340,6 +355,8 @@ class VrmCharacter implements Character {
     this.bone("head")?.getWorldPosition(this.headPos);
     this.gaze.update(dt, time, this.headPos);
     this.indicators.root.position.copy(this.headPos);
+    const playing = this.clips.amount > 0.3 ? this.clips.playingFile : null;
+    if (playing !== this.lastClipFile) this.indicators.setClip((this.lastClipFile = playing));
     this.indicators.update(time);
 
     if (em) {
@@ -457,24 +474,27 @@ class VrmCharacter implements Character {
       if (!g || g.w < 0.001) continue;
       const dir = this.armDir[side];
       const mirror = side === "left" ? -1 : 1;
-      const blend = (name: VRMHumanBoneName, order: THREE.EulerOrder = "XYZ") => {
+      // Cada parte del brazo tiene su propio peso para que lleguen en cascada (hombro → codo → muñeca → dedos).
+      const blend = (name: VRMHumanBoneName, weight: number, order: THREE.EulerOrder = "XYZ") => {
+        if (weight < 0.001) return;
         this.e.order = order;
-        this.bone(name)?.quaternion.slerp(this.qBody.setFromEuler(this.e), g.w);
+        this.bone(name)?.quaternion.slerp(this.qBody.setFromEuler(this.e), Math.min(1, weight));
         this.e.order = "XYZ";
       };
 
-      this.e.set(-g.pitch, 0, -dir * (Math.PI / 2 - g.roll));
-      blend(`${side}UpperArm`);
+      const f = this.fwd;
+      this.e.set(-g.pitch * f, (g.uTwist ?? 0) * mirror, -dir * (Math.PI / 2 - g.roll));
+      blend(`${side}UpperArm`, g.w);
       // Antebrazo: primero el giro sobre su eje (twist) y luego el codo.
-      this.e.set(g.twist ?? 0, -dir * g.elbow, 0);
-      blend(`${side}LowerArm`, "YXZ");
+      this.e.set((g.twist ?? 0) * f, -dir * f * g.elbow, 0);
+      blend(`${side}LowerArm`, g.we ?? g.w, "YXZ");
       if (g.wrist) {
-        this.e.set(g.wrist[0], g.wrist[1] * mirror, g.wrist[2] * mirror);
-        blend(`${side}Hand`);
+        this.e.set(g.wrist[0] * f, g.wrist[1] * mirror, -dir * g.wrist[2]);
+        blend(`${side}Hand`, g.wh ?? g.w);
       }
       for (const [key, [x, y, z]] of Object.entries(g.fingers ?? {})) {
-        this.e.set(x, y * mirror, z * mirror);
-        blend(`${side}${key}` as VRMHumanBoneName);
+        this.e.set(x * f, y * mirror, -dir * z);
+        blend(`${side}${key}` as VRMHumanBoneName, key.startsWith("Thumb") ? (g.wt ?? g.wf ?? g.w) : (g.wf ?? g.w));
       }
     }
   }
@@ -501,11 +521,33 @@ class VrmCharacter implements Character {
       this.e.set(pitch * share, yaw * share, roll * share, "XYZ");
       this.bone(name)?.quaternion.multiply(this.qGaze.setFromEuler(this.e));
     }
+    this.clearSleeves(amount);
+  }
+
+  /**
+   * Los clips de Mixamo llevan los brazos pegados al cuerpo (su esqueleto es más delgado que el de
+   * este modelo) y la manga atraviesa la cintura y las piernas. Si el brazo cuelga, se separa un poco
+   * del cuerpo; cuanto más levantado está, menos se corrige, y se aleja un poco más el codo.
+   */
+  private clearSleeves(amount: number) {
+    for (const side of SIDES) {
+      const dir = this.armDir[side];
+      const upper = this.bone(`${side}UpperArm`);
+      if (!upper) continue;
+      // Cuánto cuelga el brazo (1 = vertical hacia abajo), según su rotación actual desde la T-pose.
+      this.qSleeve.copy(upper.quaternion);
+      const down = -this.vSleeve.set(dir, 0, 0).applyQuaternion(this.qSleeve).y;
+      const k = Math.min(1, Math.max(0, (down - 0.6) / 0.3)) * amount;
+      if (k < 0.001) continue;
+      // Abducción en el espacio del padre (el eje Z del hombro): mismo sentido que `roll` en `arm()`.
+      this.e.set(0, 0, dir * SLEEVE_SPREAD * k, "XYZ");
+      upper.quaternion.premultiply(this.qSleeve.setFromEuler(this.e));
+    }
   }
 
   /** Rotación (Euler XYZ) de un hueso normalizado; ignora los que el modelo no tenga. */
   private rot(name: VRMHumanBoneName, x: number, y: number, z: number) {
-    this.bone(name)?.rotation.set(x, y, z);
+    this.bone(name)?.rotation.set(x * this.fwd, y, z);
   }
 
   /**
@@ -514,10 +556,10 @@ class VrmCharacter implements Character {
    */
   private arm(side: "left" | "right", pitch: number, roll: number, elbow: number) {
     const dir = this.armDir[side];
-    this.e.set(-pitch, 0, -dir * (Math.PI / 2 - roll), "XYZ");
+    this.e.set(-pitch * this.fwd, 0, -dir * (Math.PI / 2 - roll), "XYZ");
     this.bone(`${side}UpperArm`)?.quaternion.setFromEuler(this.e);
 
-    this.e.set(0, -dir * elbow, 0, "XYZ");
+    this.e.set(0, -dir * this.fwd * elbow, 0, "XYZ");
     this.bone(`${side}LowerArm`)?.quaternion.setFromEuler(this.e);
   }
 }

@@ -14,9 +14,9 @@ export function restPose(): Pose {
     headRoll: 0,
     // Brazos relajados: un poco adelantados y separados del cuerpo, con los codos algo doblados.
     armLPitch: 0.07,
-    armLRoll: 0.17,
+    armLRoll: 0.3,
     armRPitch: 0.07,
-    armRRoll: 0.17,
+    armRRoll: 0.3,
     armLElbow: 0.24,
     armRElbow: 0.24,
     weight: 0,

@@ -27,3 +27,4 @@ assets/models/*.vrm
 
 # Animaciones de Mixamo del usuario (la licencia no permite redistribuirlas como archivos sueltos)
 assets/animations/*.fbx
+tools/blender/backup/
