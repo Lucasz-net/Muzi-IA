@@ -18,7 +18,7 @@ export interface CharacterScene {
   /** Posición del cursor (px lógicos de la ventana): el personaje lo mira. */
   setGaze: (x: number, y: number) => void;
   setSpeaking: (speaking: boolean) => void;
-  pulseMouth: () => void;
+  pulseMouth: (vowel?: "aa" | "ih" | "ou" | "ee" | "oh") => void;
   /** Solo desarrollo: reproduce un clip por nombre de archivo (`null` para, sin argumento vuelve a los estados). */
   playClip: (file?: string | null) => void;
   /** Solo desarrollo: nombres de los clips cargados. */
@@ -126,7 +126,8 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     rootStyle.setProperty(name, `${Math.round(value)}px`);
   };
   const trackHead = () => {
-    const p = character.headPosition?.();
+    // Se usa la cabeza en reposo, no la animada: si no, el globo y el chat bailan con cada gesto.
+    const p = character.anchorPosition?.() ?? character.headPosition?.();
     if (!p) return;
     camera.updateMatrixWorld();
     const r = canvas.getBoundingClientRect();
@@ -194,7 +195,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
       character.setGaze?.(nx, ny, now());
     },
     setSpeaking: (speaking) => character.setSpeaking?.(speaking),
-    pulseMouth: () => character.pulseMouth?.(),
+    pulseMouth: (vowel) => character.pulseMouth?.(vowel),
     playClip: (file) => character.playClip?.(file),
     listClips: () => character.listClips?.() ?? [],
     gesture: (name) => character.gesture?.(name) ?? false,

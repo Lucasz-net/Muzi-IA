@@ -17,6 +17,8 @@ import { createMenu } from "./ui/menu";
 import { createSpeechBubble } from "./ui/speechBubble";
 import { createAnnouncer } from "./voice/announcer";
 import { createJaVoice } from "./voice/jaVoice";
+import { createLiveVoice } from "./voice/liveVoice";
+import { createVoiceTagFilter } from "./voice/voiceTags";
 import { createCaption } from "./ui/caption";
 import { createPiperTTS } from "./voice/piperProvider";
 import { createTTS } from "./voice/webSpeechProvider";
@@ -39,13 +41,17 @@ const settings = createSettings();
 // Lee en voz alta las respuestas (resumen o completa, según el ajuste), más allá de los avisos.
 // "rough": si el turno tuvo tropiezos, la lectura y el "terminé" suenan serenos (ver `reactions`, más abajo).
 const narrator = createNarrator(tts, {
-  mode: () => settings.get().read,
+  // Con la voz en vivo hablando en este turno, la lectura en español se calla para que no se pisen.
+  mode: () => (live.ready && live.turnLines > 0 ? "off" : settings.get().read),
   isRough: () => reactions.rough,
   enabled: () => announcer.enabled, // el botón de silenciar del menú también calla la lectura
 });
 // La voz de Mizu: frases cortas en japonés pregrabadas (arranque, órdenes, trabajo, permisos, "terminé", errores, charla en reposo).
 const ja = createJaVoice();
+// Voz en vivo: lo que Mizu decide contarte, sintetizado al momento con VOICEVOX (si el motor está en el equipo).
+const live = createLiveVoice(ja, { wanted: () => settings.get().liveVoice === "on" });
 const announcer = createAnnouncer(ja, tts, {
+  live: { ready: () => live.ready, turnLines: () => live.turnLines, busy: () => live.busy, cancel: () => live.cancel() },
   isRough: () => reactions.rough,
   suppressDone: () => narrator.willSpeak,
   chatter: () => settings.get().chatter,
@@ -65,7 +71,21 @@ tts.onSpeakingChange((speaking) => {
   bubble.setReading(speaking); // el botón de leer del globo se marca mientras habla
 });
 ja.onSpeakingChange((speaking) => stage.setSpeaking(speaking));
-ja.onPulse(() => stage.pulseMouth());
+ja.onPulse((vowel) => stage.pulseMouth(vowel));
+// Las frases de voz llegan dentro de los mensajes del agente; el filtro las separa del texto y aquí se dicen.
+const voiceTags = createVoiceTagFilter((line) => {
+  if (announcer.enabled) live.say(line);
+});
+setTimeout(() => live.sync().catch(console.error), 3000);
+let lastLive = settings.get().liveVoice;
+settings.onChange((s) => {
+  if (s.liveVoice === lastLive) return;
+  lastLive = s.liveVoice;
+  live.sync().catch(console.error);
+});
+// Cristal de la interfaz: el CSS lee el nivel de <html data-glass>.
+document.documentElement.dataset.glass = settings.get().glass;
+settings.onChange((s) => (document.documentElement.dataset.glass = s.glass));
 // Gestos en reposo según el ajuste (hay que esperar a que cargue el modelo: el de relleno no los hace).
 stage.modelReady.then(() => stage.setGestureLevel(settings.get().gestures)).catch(console.error);
 settings.onChange((s) => stage.setGestureLevel(s.gestures));
@@ -103,7 +123,7 @@ if (import.meta.env.DEV) {
   mizuSay("texto")                         voz + lipsync
   mizuUi.bubble.handle({ type: "message", text: "**hola**", is_delta: false })   probar el globo
 Clips cargados: ${stage.listClips().join(", ") || "(ninguno todavía)"}`);
-Object.assign(window, { mizu: machine, mizuSay: (text: string) => tts.speak(text), mizuTts: tts, mizuJa: ja, mizuStage: stage, mizuHelp });
+Object.assign(window, { mizu: machine, mizuSay: (text: string) => tts.speak(text), mizuTts: tts, mizuJa: ja, mizuLive: live, mizuStage: stage, mizuHelp });
 }
 
 // --- Vista (cuerpo completo / plano medio), recordada entre sesiones ---
@@ -130,7 +150,12 @@ const bubble = createSpeechBubble(ui, {
 });
 // Permisos recordados ("Siempre"): reglas estrechas que evitan volver a preguntar lo mismo.
 const rules = createRuleStore();
-const permissions = createPermissionPrompt(ui, rules);
+const permissions = createPermissionPrompt(
+  ui,
+  rules,
+  () => settings.get().autoApprove === "on",
+  (d) => announcer.play(d, { interrupt: true }),
+);
 const rulesPanel = createRulesPanel(ui, rules);
 /** Cambiar la forma de hablar o el control del PC reinicia el proceso de Claude Code (se fijan al lanzarlo) pero sigue la misma conversación. */
 const changeBackend = async (apply: () => Promise<unknown>) => {
@@ -142,16 +167,21 @@ const changeBackend = async (apply: () => Promise<unknown>) => {
   await apply();
   return true;
 };
-const settingsPanel = createSettingsPanel(ui, settings, {
-  persona: {
-    load: async () => (await agent.getConfig()).persona ?? "mizu",
-    save: (value) => changeBackend(() => agent.setPersona(value)),
+const settingsPanel = createSettingsPanel(
+  ui,
+  settings,
+  {
+    persona: {
+      load: async () => (await agent.getConfig()).persona ?? "mizu",
+      save: (value) => changeBackend(() => agent.setPersona(value)),
+    },
+    desktop: {
+      load: async () => ((await agent.getConfig()).desktop === false ? "off" : "on"),
+      save: (value) => changeBackend(() => agent.setDesktop(value === "on")),
+    },
   },
-  desktop: {
-    load: async () => ((await agent.getConfig()).desktop === false ? "off" : "on"),
-    save: (value) => changeBackend(() => agent.setDesktop(value === "on")),
-  },
-});
+  { get: () => live.status, onChange: (cb) => live.onStatus(cb) },
+);
 if (import.meta.env.DEV) Object.assign(window, { mizuUi: { bubble } });
 // Subtítulo japonés sobre la cabeza, con la traducción debajo (ajuste).
 const caption = createCaption(ui, { translation: () => settings.get().translation === "on" });
@@ -186,6 +216,7 @@ const submit = (text: string) => {
   history.addUser(text);
   bubble.reset();
   machine.userSent();
+  live.userSent();
   announcer.userSent();
   narrator.userSent();
   reactions.userSent();
@@ -342,9 +373,12 @@ const side = createMenu(ui, {
 
 // --- Eventos del agente ---
 agent
-  .onEvent((ev) => {
+  .onEvent((incoming) => {
     // Un permiso que ya marcaste como "Siempre" se aprueba solo, sin tarjeta, gesto ni aviso.
-    if (permissions.tryAutoAllow(ev)) return;
+    if (permissions.tryAutoAllow(incoming)) return;
+    // Lo que Mizu dice en voz alta va dentro del mensaje: se separa (y se dice) antes de mostrar el texto.
+    const ev = voiceTags.filter(incoming);
+    if (!ev) return;
     machine.handle(ev);
     announcer.handle(ev); // antes que el narrador: consulta si éste va a contar el resultado para no decir "terminé" dos veces
     narrator.handle(ev);

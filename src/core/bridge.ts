@@ -29,6 +29,25 @@ export const memory = {
   clear: () => invoke<void>("memory_clear"),
 };
 
+/** Estado del motor de voz en vivo (VOICEVOX local, ver `voicevox.rs`). */
+export interface VoiceEngineStatus {
+  running: boolean;
+  installed: boolean;
+  launched: boolean;
+  path: string | null;
+}
+
+export const voiceEngine = {
+  status: () => invoke<VoiceEngineStatus>("voice_engine_status"),
+  start: () => invoke<VoiceEngineStatus>("voice_engine_start"),
+  stop: () => invoke<void>("voice_engine_stop"),
+  warmup: (speaker: number) => invoke<void>("voice_warmup", { speaker }),
+  /** Consulta de audio (JSON) de un texto japonés. */
+  query: (text: string, speaker: number) => invoke<string>("voice_query", { text, speaker }),
+  /** Audio WAV de una consulta. */
+  synthesis: (query: string, speaker: number) => invoke<ArrayBuffer>("voice_synthesis", { query, speaker }),
+};
+
 /** Puente tipado con el backend. Toda la comunicación con Rust pasa por aquí. */
 export const agent = {
   onEvent(handler: (ev: AgentEvent) => void): Promise<UnlistenFn> {
@@ -37,8 +56,9 @@ export const agent = {
   send: (text: string) => invoke<void>("agent_send", { text }),
   stop: () => invoke<void>("agent_stop"),
   newConversation: () => invoke<void>("agent_new_conversation"),
-  respondPermission: (requestId: string, allow: boolean, message?: string) =>
-    invoke<void>("agent_respond_permission", { requestId, allow, message: message ?? null }),
+  /** `updatedInput` sustituye a la entrada original al aceptar (así se devuelven las respuestas de una pregunta). */
+  respondPermission: (requestId: string, allow: boolean, message?: string, updatedInput?: unknown) =>
+    invoke<void>("agent_respond_permission", { requestId, allow, message: message ?? null, updatedInput: updatedInput ?? null }),
   getConfig: () => invoke<ConfigView>("agent_get_config"),
   setConfig: (config: AgentConfig) => invoke<ConfigView>("agent_set_config", { config }),
   /** Cambia la forma de hablar sin perder la conversación. */

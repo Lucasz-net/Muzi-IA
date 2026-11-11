@@ -32,6 +32,8 @@ export function createStateMachine(opts: StateMachineOptions = {}): StateMachine
 
   let state: CompanionState = "idle";
   let timer: ReturnType<typeof setTimeout> | undefined;
+  /** En este turno se usaron herramientas: al terminar hay algo que celebrar (una simple respuesta de charla no). */
+  let worked = false;
   const listeners = new Set<(s: CompanionState, p: CompanionState) => void>();
 
   const set = (next: CompanionState, revertAfterMs?: number) => {
@@ -54,6 +56,7 @@ export function createStateMachine(opts: StateMachineOptions = {}): StateMachine
           set("thinking");
           break;
         case "tool_use":
+          worked = true;
           set("working");
           break;
         case "tool_result":
@@ -67,7 +70,10 @@ export function createStateMachine(opts: StateMachineOptions = {}): StateMachine
           set("responding");
           break;
         case "done":
-          set("celebrating", celebrateMs);
+          // Solo celebra un trabajo hecho; tras charlar un rato vuelve al reposo sin dar saltos.
+          if (worked) set("celebrating", celebrateMs);
+          else set("idle");
+          worked = false;
           break;
         case "error":
           set("error", errorMs);
@@ -80,6 +86,7 @@ export function createStateMachine(opts: StateMachineOptions = {}): StateMachine
       }
     },
     userSent() {
+      worked = false;
       set("thinking");
     },
     force(next) {

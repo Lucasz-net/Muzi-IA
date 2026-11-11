@@ -56,7 +56,9 @@ export interface Character {
   /** El personaje está hablando (voz): activa el lipsync. */
   setSpeaking?(speaking: boolean): void;
   /** Una palabra nueva: empuja la boca. */
-  pulseMouth?(): void;
+  pulseMouth?(vowel?: "aa" | "ih" | "ou" | "ee" | "oh"): void;
+  /** Punto fijo (m) junto al que se coloca la interfaz: la cabeza en reposo, sin seguir las animaciones. */
+  anchorPosition?(): Vector3 | null;
   /** Carga animaciones (Mixamo) asignadas a estados. */
   loadAnimations?(entries: import("./clipLayer").ClipEntry[]): Promise<void>;
   /** Reproduce un clip a mano (desarrollo): `null` para, `undefined` vuelve al comportamiento por estado. */

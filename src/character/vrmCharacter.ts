@@ -6,7 +6,7 @@ import { Blink } from "./blink";
 import { ClipLayer, type ClipEntry } from "./clipLayer";
 import { loadMixamoClip } from "./mixamo";
 import { Gaze } from "./gaze";
-import { emptyFrame, Gestures, IDLE_GESTURES, type ArmGesture, type GestureFrame } from "./gestures";
+import { emptyFrame, Gestures, IDLE_GESTURES, type ArmGesture, type GestureFrame, type Reach } from "./gestures";
 import { createHeart } from "./heart";
 import { createIndicators } from "./indicators";
 import { Lipsync } from "./lipsync";
@@ -77,6 +77,33 @@ const HEAD_SHARE = 0.6;
 /** Radianes de giro de cabeza por unidad de mirada normalizada. */
 const GAZE_HEAD_YAW = 0.45;
 const GAZE_HEAD_PITCH = 0.25;
+
+/** Medidas de un brazo en reposo (T-pose), en el mundo: lo que necesita la cinemática inversa de los gestos. */
+interface ArmRig {
+  upper: THREE.Object3D;
+  lower: THREE.Object3D;
+  hand: THREE.Object3D;
+  /** Largo del brazo y del antebrazo (m). */
+  l1: number;
+  l2: number;
+  /** Dirección en reposo del brazo, del antebrazo y de los dedos. */
+  dirU: THREE.Vector3;
+  dirL: THREE.Vector3;
+  dirF: THREE.Vector3;
+  /** Rotación en el mundo de cada hueso en reposo. */
+  restU: THREE.Quaternion;
+  restL: THREE.Quaternion;
+  restH: THREE.Quaternion;
+  /** Inversa de la base (dedos, palma, pulgar) de la mano en reposo. */
+  handBasisInv: THREE.Matrix4;
+  /** Eje del antebrazo en el espacio local del propio antebrazo (para repartir el giro de la muñeca). */
+  axisL: THREE.Vector3;
+}
+
+/** Hacia dónde cae el codo si el gesto no dice otra cosa: [fuera, atrás]. */
+const DEFAULT_ELBOW: [number, number] = [0.55, 0.3];
+/** Parte del giro de la muñeca sobre el eje del antebrazo que se lleva el antebrazo (si no, la muñeca se estrangula). */
+const FOREARM_TWIST_SHARE = 0.55;
 
 /** Carga un .vrm y lo envuelve como `Character`. */
 export async function loadVrmCharacter(url: string): Promise<Character> {
@@ -166,11 +193,15 @@ class VrmCharacter implements Character {
   private readonly headPos = new THREE.Vector3();
   private readonly headCenter = new THREE.Vector3();
   private readonly headLift = new THREE.Vector3(0, 0.08, 0);
+  private readonly restHead = new THREE.Vector3();
   private readonly e = new THREE.Euler();
   private readonly qGaze = new THREE.Quaternion();
   private lastClipFile: string | null = null;
   private readonly qSleeve = new THREE.Quaternion();
   private readonly vSleeve = new THREE.Vector3();
+  private readonly rigs: { left?: ArmRig; right?: ArmRig } = {};
+  /** Rotaciones locales que resuelve la cinemática inversa (brazo, antebrazo, mano). */
+  private readonly ik = { u: new THREE.Quaternion(), l: new THREE.Quaternion(), h: new THREE.Quaternion() };
 
   constructor(private readonly vrm: VRM) {
     this.root.add(vrm.scene, this.indicators.root, this.heart.root);
@@ -206,6 +237,9 @@ class VrmCharacter implements Character {
     const spine = this.bone("spine");
     if (spine?.parent) front.transformDirection(spine.parent.matrixWorld.clone().invert());
     this.fwd = front.z < 0 ? -1 : 1;
+    this.bone("head")?.getWorldPosition(this.restHead);
+    this.restHead.add(this.headLift);
+    for (const s of SIDES) this.rigs[s] = this.measureArm(s);
     this.armDir = {
       left: side("leftUpperArm", "leftHand"),
       right: side("rightUpperArm", "rightHand"),
@@ -257,12 +291,17 @@ class VrmCharacter implements Character {
     return this.gestures.trigger(name);
   }
 
-  /** Con qué frecuencia lanza gestos sola en reposo: "off" los apaga; los demás espacian más o menos el reloj. */
   /** Centro de la cabeza en el mundo: el hueso de la cabeza está en la base del cráneo, así que se sube un poco. */
   headPosition() {
     return this.headCenter.copy(this.headPos).add(this.headLift);
   }
 
+  /** La cabeza en reposo (medida al cargar): la interfaz se ancla aquí y no baila con las animaciones. */
+  anchorPosition() {
+    return this.restHead;
+  }
+
+  /** Con qué frecuencia lanza gestos sola en reposo: "off" los apaga; los demás espacian más o menos el reloj. */
   setGestureLevel(level: GestureLevel) {
     this.autoGestures = level !== "off";
     this.gestureFactor = { off: 1, pocos: 2.2, normal: 1, muchos: 0.45 }[level];
@@ -281,8 +320,8 @@ class VrmCharacter implements Character {
     this.lipsync.setSpeaking(speaking);
   }
 
-  pulseMouth() {
-    this.lipsync.pulse();
+  pulseMouth(vowel?: Parameters<Lipsync["pulse"]>[0]) {
+    this.lipsync.pulse(vowel);
   }
 
   applyPose(p: Pose, _time: number) {
@@ -483,20 +522,119 @@ class VrmCharacter implements Character {
       };
 
       const f = this.fwd;
-      this.e.set(-g.pitch * f, (g.uTwist ?? 0) * mirror, -dir * (Math.PI / 2 - g.roll));
-      blend(`${side}UpperArm`, g.w);
-      // Antebrazo: primero el giro sobre su eje (twist) y luego el codo.
-      this.e.set((g.twist ?? 0) * f, -dir * f * g.elbow, 0);
-      blend(`${side}LowerArm`, g.we ?? g.w, "YXZ");
-      if (g.wrist) {
-        this.e.set(g.wrist[0] * f, g.wrist[1] * mirror, -dir * g.wrist[2]);
-        blend(`${side}Hand`, g.wh ?? g.w);
+      const rig = this.rigs[side];
+      if (g.reach && rig && this.solveReach(side, rig, g.reach)) {
+        // La mano va a un punto: el brazo, el antebrazo y la muñeca salen de la cinemática inversa.
+        rig.upper.quaternion.slerp(this.ik.u, Math.min(1, g.w));
+        rig.lower.quaternion.slerp(this.ik.l, Math.min(1, g.we ?? g.w));
+        rig.hand.quaternion.slerp(this.ik.h, Math.min(1, g.wh ?? g.w));
+      } else {
+        this.e.set(-g.pitch * f, (g.uTwist ?? 0) * mirror, -dir * (Math.PI / 2 - g.roll));
+        blend(`${side}UpperArm`, g.w);
+        // Antebrazo: primero el giro sobre su eje (twist) y luego el codo.
+        this.e.set((g.twist ?? 0) * f, -dir * f * g.elbow, 0);
+        blend(`${side}LowerArm`, g.we ?? g.w, "YXZ");
+        if (g.wrist) {
+          this.e.set(g.wrist[0] * f, g.wrist[1] * mirror, -dir * g.wrist[2]);
+          blend(`${side}Hand`, g.wh ?? g.w);
+        }
       }
       for (const [key, [x, y, z]] of Object.entries(g.fingers ?? {})) {
         this.e.set(x * f, y * mirror, -dir * z);
         blend(`${side}${key}` as VRMHumanBoneName, key.startsWith("Thumb") ? (g.wt ?? g.wf ?? g.w) : (g.wf ?? g.w));
       }
     }
+  }
+
+  /** Mide un brazo en reposo. Se llama al cargar, con el modelo aún en T-pose. */
+  private measureArm(side: "left" | "right"): ArmRig | undefined {
+    const upper = this.bone(`${side}UpperArm`);
+    const lower = this.bone(`${side}LowerArm`);
+    const hand = this.bone(`${side}Hand`);
+    if (!upper || !lower || !hand) return undefined;
+    const pos = (o: THREE.Object3D) => o.getWorldPosition(new THREE.Vector3());
+    const [pu, pl, ph] = [pos(upper), pos(lower), pos(hand)];
+    const knuckle = this.bone(`${side}MiddleProximal`);
+    const dirL = ph.clone().sub(pl).normalize();
+    const dirF = knuckle ? pos(knuckle).sub(ph).normalize() : dirL.clone();
+    // Base de la mano en reposo: dedos, palma (hacia abajo en T-pose) y el tercer eje.
+    const palm = new THREE.Vector3(0, -1, 0).addScaledVector(dirF, dirF.y).normalize();
+    const basis = new THREE.Matrix4().makeBasis(dirF, palm, new THREE.Vector3().crossVectors(dirF, palm));
+    return {
+      upper,
+      lower,
+      hand,
+      l1: pu.distanceTo(pl),
+      l2: pl.distanceTo(ph),
+      dirU: pl.clone().sub(pu).normalize(),
+      dirL,
+      dirF,
+      restU: upper.getWorldQuaternion(new THREE.Quaternion()),
+      restL: lower.getWorldQuaternion(new THREE.Quaternion()),
+      restH: hand.getWorldQuaternion(new THREE.Quaternion()),
+      handBasisInv: basis.invert(),
+      axisL: hand.position.clone().normalize(),
+    };
+  }
+
+  /**
+   * Cinemática inversa de dos huesos: deja en `this.ik` las rotaciones locales del brazo, el antebrazo y la mano para
+   * que la muñeca quede en el punto pedido, con el codo cayendo hacia abajo y afuera y la mano orientada como se pide.
+   * Se trabaja en el mundo (el personaje mira a +Z y su izquierda es +X), así vale para VRM 0.x y 1.0 sin casos aparte.
+   */
+  private solveReach(side: "left" | "right", rig: ArmRig, reach: Reach): boolean {
+    const parent = rig.upper.parent;
+    if (!parent) return false;
+    const sx = side === "left" ? 1 : -1;
+    const A = rig.l1 + rig.l2;
+    const v = (x: number, y: number, z: number) => new THREE.Vector3(x * sx, y, z);
+    const parentQ = parent.getWorldQuaternion(new THREE.Quaternion());
+
+    // Triángulo hombro-codo-muñeca.
+    const toT = v(...reach.at).multiplyScalar(A);
+    const d = THREE.MathUtils.clamp(toT.length(), Math.abs(rig.l1 - rig.l2) + 0.01, A * 0.995);
+    const dir = toT.lengthSq() > 1e-8 ? toT.clone().normalize() : v(0, -1, 0);
+    const a = (rig.l1 * rig.l1 - rig.l2 * rig.l2 + d * d) / (2 * d);
+    const h = Math.sqrt(Math.max(0, rig.l1 * rig.l1 - a * a));
+    const [out, back] = reach.elbow ?? DEFAULT_ELBOW;
+    const pole = v(out, -1, -back);
+    pole.addScaledVector(dir, -pole.dot(dir));
+    if (pole.lengthSq() < 1e-6) pole.copy(v(1, 0, 0));
+    pole.normalize();
+    const elbow = dir.clone().multiplyScalar(a).addScaledVector(pole, h); // relativo al hombro
+    const u = elbow.clone().normalize();
+    const l = dir.clone().multiplyScalar(d).sub(elbow).normalize();
+
+    // Brazo: del reposo a su nueva dirección por el camino más corto. Antebrazo: lo que falta, doblando solo el codo.
+    const dU = new THREE.Quaternion().setFromUnitVectors(rig.dirU, u);
+    const dL = new THREE.Quaternion().setFromUnitVectors(rig.dirL.clone().applyQuaternion(dU), l).multiply(dU);
+    const wU = dU.clone().multiply(rig.restU);
+    const wL = dL.clone().multiply(rig.restL);
+
+    // Mano: base (dedos, palma) pedida frente a la de reposo.
+    const fingers = v(...reach.fingers).normalize();
+    const palm = v(...reach.palm);
+    palm.addScaledVector(fingers, -palm.dot(fingers));
+    if (palm.lengthSq() < 1e-6) palm.copy(v(0, 0, 1)).addScaledVector(fingers, -fingers.z);
+    palm.normalize();
+    const want = new THREE.Matrix4().makeBasis(fingers, palm, new THREE.Vector3().crossVectors(fingers, palm));
+    const wH = new THREE.Quaternion().setFromRotationMatrix(want.multiply(rig.handBasisInv)).multiply(rig.restH);
+
+    this.ik.u.copy(parentQ).invert().multiply(wU);
+    this.ik.l.copy(wU).invert().multiply(wL);
+    this.ik.h.copy(wL).invert().multiply(wH);
+
+    // El giro de la muñeca sobre el eje del antebrazo se reparte con el antebrazo, como en un brazo de verdad.
+    const q = this.ik.h;
+    const proj = rig.axisL.x * q.x + rig.axisL.y * q.y + rig.axisL.z * q.z;
+    const twist = new THREE.Quaternion(rig.axisL.x * proj, rig.axisL.y * proj, rig.axisL.z * proj, q.w);
+    if (twist.lengthSq() > 1e-8) {
+      twist.normalize();
+      const part = new THREE.Quaternion().slerp(twist, FOREARM_TWIST_SHARE);
+      this.ik.l.multiply(part);
+      this.ik.h.premultiply(part.invert());
+    }
+    return true;
   }
 
   /** Solo desarrollo: fija los brazos a una pose (peso 1) para ajustarla en vivo; `null` la suelta. */

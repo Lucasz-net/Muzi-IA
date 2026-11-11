@@ -25,10 +25,10 @@ export class Lipsync {
     if (value) this.pulse();
   }
 
-  /** Nueva palabra: cambia de vocal y abre un poco más. */
-  pulse() {
+  /** Nueva sílaba: abre un poco más y cambia de vocal (la que se indique o, si no se sabe, una al azar). */
+  pulse(vowel?: Viseme) {
     this.bump = 1;
-    this.vowel = PICK[Math.floor(Math.random() * PICK.length)];
+    this.vowel = vowel ?? PICK[Math.floor(Math.random() * PICK.length)];
   }
 
   update(dt: number): Record<Viseme, number> {

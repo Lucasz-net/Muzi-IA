@@ -45,7 +45,7 @@ const DESKTOP_PERM: Record<string, string> = {
   focus_window: "perm_window",
 };
 const permCategory = (tool: string) =>
-  tool.startsWith("mcp__mizu-desktop__") ? (DESKTOP_PERM[tool.slice(19)] ?? "perm_generic") : (PERM_CATEGORY[tool] ?? "perm_generic");
+  tool === "AskUserQuestion" ? "ask_question" : tool === "ExitPlanMode" ? "ask_plan" : tool.startsWith("mcp__mizu-desktop__") ? (DESKTOP_PERM[tool.slice(19)] ?? "perm_generic") : (PERM_CATEGORY[tool] ?? "perm_generic");
 
 /** Categoría de frases al usar una herramienta (si no, una frase de trabajo cualquiera). */
 const TOOL_CATEGORY: Record<string, string> = {
@@ -85,12 +85,14 @@ export interface AnnouncerOptions {
   chatter?: () => ChatterLevel;
   /** ¿Se puede charlar ahora? (por ejemplo, no con el micrófono escuchando ni con un panel abierto). */
   canChatter?: () => boolean;
+  /** Voz en vivo (ver `liveVoice.ts`): si está lista, las frases grabadas de «te cuento» y «terminé» sobran. */
+  live?: { ready: () => boolean; turnLines: () => number; busy: () => boolean; cancel: () => void };
 }
 
 export function createAnnouncer(
   voice: JaVoice,
   tts: TTSProvider,
-  { isRough = () => false, suppressDone = () => false, chatter = () => "normal", canChatter = () => true }: AnnouncerOptions = {},
+  { isRough = () => false, suppressDone = () => false, chatter = () => "normal", canChatter = () => true, live }: AnnouncerOptions = {},
 ) {
   let enabled = loadEnabled();
   let startedAt = 0;
@@ -112,6 +114,7 @@ export function createAnnouncer(
   const play = (category: string, opts: JaPlayOptions & { probability?: number } = {}) => {
     if (!enabled) return false;
     if (opts.probability !== undefined && Math.random() > opts.probability) return false;
+    if (opts.interrupt) live?.cancel(); // un aviso urgente pasa por delante de lo que estuviera por decir en vivo
     const spoke = voice.play(category, opts);
     if (spoke) {
       lastSpokeAt = Date.now();
@@ -122,7 +125,7 @@ export function createAnnouncer(
 
   // Charla en reposo: cada cierto tiempo, si no hay nada en marcha, una frase suelta.
   setInterval(() => {
-    if (!enabled || inTurn || voice.speaking || Date.now() < nextChatterAt) return;
+    if (!enabled || inTurn || voice.speaking || live?.busy() || Date.now() < nextChatterAt) return;
     if (!canChatter()) return scheduleChatter();
     play("idle");
   }, 5000);
@@ -134,6 +137,7 @@ export function createAnnouncer(
     setEnabled(value: boolean) {
       enabled = value;
       if (!value) {
+        live?.cancel();
         voice.cancel();
         tts.cancel();
       }
@@ -149,6 +153,7 @@ export function createAnnouncer(
     rescheduleChatter: scheduleChatter,
     /** El usuario envió un mensaje: corta lo que estuviera diciendo, confirma y empieza a medir el turno. */
     userSent() {
+      live?.cancel();
       voice.cancel();
       tts.cancel();
       startedAt = Date.now();
@@ -180,13 +185,17 @@ export function createAnnouncer(
           // Primera respuesta del turno: una frasecita antes de contar (sin cortar lo que ya esté diciendo).
           if (!spokeResponse) {
             spokeResponse = true;
-            play("responding", { probability: 0.7 });
+            if (!live?.ready()) play("responding", { probability: 0.7 }); // en vivo ya lo cuenta ella con sus palabras
           }
           break;
         case "done": {
           inTurn = false;
           const elapsed = Date.now() - startedAt;
-          if ((toolsUsed > 0 || elapsed >= MIN_TASK_MS) && Date.now() - lastSpokeAt > QUIET_AFTER_SPEECH_MS && !suppressDone()) {
+          const saidLive = (live?.turnLines() ?? 0) > 0 || live?.busy();
+          if (saidLive) {
+            lastSpokeAt = Date.now();
+            scheduleChatter();
+          } else if ((toolsUsed > 0 || elapsed >= MIN_TASK_MS) && Date.now() - lastSpokeAt > QUIET_AFTER_SPEECH_MS && !suppressDone()) {
             play(isRough() ? "done_rough" : elapsed >= LONG_TASK_MS ? "done_long" : "done_ok", { interrupt: true });
           }
           break;
@@ -198,6 +207,7 @@ export function createAnnouncer(
         case "idle":
           // El usuario detuvo la tarea.
           tts.cancel();
+          live?.cancel();
           if (inTurn) {
             inTurn = false;
             play("stopped", { interrupt: true });

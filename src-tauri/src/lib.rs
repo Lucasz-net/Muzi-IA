@@ -4,6 +4,7 @@ mod mcp_desktop;
 mod mcp_memory;
 mod memory;
 mod tray;
+mod voicevox;
 mod window;
 
 use tauri::Manager;
@@ -30,6 +31,7 @@ pub fn run() {
             tray::register_shortcut(app.handle())?;
             let config_path = app.path().app_config_dir()?.join("config.json");
             app.manage(commands::AgentState::load(config_path));
+            app.manage(voicevox::VoiceEngine::default());
 
             let win = app
                 .get_webview_window("main")
@@ -55,6 +57,12 @@ pub fn run() {
             commands::memory_list,
             commands::memory_delete,
             commands::memory_clear,
+            voicevox::voice_engine_status,
+            voicevox::voice_engine_start,
+            voicevox::voice_engine_stop,
+            voicevox::voice_warmup,
+            voicevox::voice_query,
+            voicevox::voice_synthesis,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -63,6 +71,9 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
                 if let Some(state) = app.try_state::<commands::AgentState>() {
                     state.stop_session();
+                }
+                if let Some(engine) = app.try_state::<voicevox::VoiceEngine>() {
+                    engine.stop();
                 }
             }
         });

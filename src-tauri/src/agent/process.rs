@@ -58,13 +58,16 @@ impl AgentSession {
         request_id: &str,
         allow: bool,
         message: Option<&str>,
+        updated_input: Option<Value>,
     ) -> Result<(), String> {
-        let input = self
+        let original = self
             .pending
             .lock()
             .unwrap()
             .remove(request_id)
             .ok_or_else(|| format!("Solicitud de permiso desconocida: {request_id}"))?;
+        // Las preguntas al usuario (AskUserQuestion) se contestan devolviendo la entrada con las respuestas añadidas.
+        let input = updated_input.unwrap_or(original);
         match self.adapter.encode_permission_response(request_id, allow, &input, message) {
             Some(line) => self.write_line(&line),
             None => Ok(()),

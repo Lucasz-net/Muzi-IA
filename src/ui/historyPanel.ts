@@ -69,7 +69,7 @@ export function createHistoryPanel(parent: HTMLElement, onNewConversation: () =>
           break;
         }
         case "waiting_permission":
-          add("system", `Permiso solicitado: ${ev.tool_name}`);
+          add("system", ev.tool_name === "AskUserQuestion" ? "Pregunta para ti" : ev.tool_name === "ExitPlanMode" ? "Plan para aprobar" : `Permiso solicitado: ${ev.tool_name}`);
           break;
         case "error":
           assistantEntry = null;

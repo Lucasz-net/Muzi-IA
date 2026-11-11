@@ -93,7 +93,9 @@ export function createSpeechBubble(parent: HTMLElement, { onRead }: { onRead?: (
           show();
           break;
         case "waiting_permission":
-          setStatus(`Necesito tu permiso para ${ev.tool_name}`);
+          setStatus(
+            ev.tool_name === "AskUserQuestion" ? "Necesito que me ayudes a decidir" : ev.tool_name === "ExitPlanMode" ? "Te enseño mi plan" : `Necesito tu permiso para ${ev.tool_name}`,
+          );
           show();
           break;
         case "message":

@@ -49,6 +49,12 @@ export function revealTimes(line: JaLine): number[] {
   });
 }
 
+/** Movimiento de boca en un instante del audio: la vocal que suena (visema VRM). */
+export interface MouthCue {
+  at: number;
+  v: "aa" | "ih" | "ou" | "ee" | "oh";
+}
+
 export interface JaPlayOptions {
   /** Corta lo que esté sonando (avisos importantes: permisos, "terminé", errores). Si no, la frase se omite si ya está hablando. */
   interrupt?: boolean;
@@ -64,9 +70,16 @@ export function createJaVoice() {
   let raf = 0;
   let volume = 1;
   let token = 0;
+  /** Sílabas con su vocal e instante (voz en vivo); sin ellas la boca se mueve al ritmo del subtítulo. */
+  let cues: MouthCue[] | null = null;
+  let cueIndex = 0;
+  /** La voz en vivo tiene frases esperando: las grabadas que no sean urgentes se callan. */
+  let reserved = false;
+  /** URL temporal del audio en curso (voz en vivo), para liberarla al acabar. */
+  let blobUrl: string | null = null;
   const lastIndex = new Map<string, number>();
   const speakingCbs = new Set<(s: boolean) => void>();
-  const pulseCbs = new Set<() => void>();
+  const pulseCbs = new Set<(v?: MouthCue["v"]) => void>();
   const lineCbs = new Set<(line: JaLine | null, shown: number) => void>();
   let speaking = false;
 
@@ -76,9 +89,15 @@ export function createJaVoice() {
     speakingCbs.forEach((cb) => cb(v));
   };
 
+  const release = () => {
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    blobUrl = null;
+  };
+
   const finish = (t: number) => {
     if (t !== token) return;
     cancelAnimationFrame(raf);
+    release();
     audio = null;
     current = null;
     setSpeaking(false);
@@ -88,12 +107,18 @@ export function createJaVoice() {
   const tick = (t: number) => {
     if (t !== token || !audio || !current) return;
     const now = audio.currentTime * 1000;
+    if (cues) {
+      for (; cueIndex < cues.length && cues[cueIndex].at <= now; cueIndex++) {
+        const v = cues[cueIndex].v;
+        pulseCbs.forEach((cb) => cb(v));
+      }
+    }
     let n = shown;
     while (n < times.length && times[n] <= now) n++;
     if (n !== shown) {
       const chars = [...current.ja];
       // Una sílaba nueva (no un signo) empuja la boca.
-      for (let i = shown; i < n; i++) if (charWeight(chars[i]) >= 1 && !/[。！？!?…、，,\s]/.test(chars[i])) pulseCbs.forEach((cb) => cb());
+      if (!cues) for (let i = shown; i < n; i++) if (charWeight(chars[i]) >= 1 && !/[。！？!?…、，,\s]/.test(chars[i])) pulseCbs.forEach((cb) => cb());
       shown = n;
       lineCbs.forEach((cb) => cb(current, shown));
     }
@@ -108,9 +133,36 @@ export function createJaVoice() {
       audio.pause();
     }
     audio = null;
+    release();
     if (current) lineCbs.forEach((cb) => cb(null, 0));
     current = null;
     setSpeaking(false);
+  };
+
+  const begin = (line: JaLine, url: string, mouth: MouthCue[] | null) => {
+    stop();
+    const t = ++token;
+    const a = new Audio(url);
+    a.volume = volume;
+    audio = a;
+    current = line;
+    times = revealTimes(line);
+    shown = 0;
+    cues = mouth;
+    cueIndex = 0;
+    a.onended = () => finish(t);
+    a.onerror = () => finish(t);
+    a.play().then(
+      () => {
+        if (t !== token) return;
+        setSpeaking(true);
+        lineCbs.forEach((cb) => cb(line, 0));
+        raf = requestAnimationFrame(() => tick(t));
+      },
+      // El navegador puede bloquear el audio hasta el primer clic: entonces no hay voz ni subtítulo.
+      () => finish(t),
+    );
+    return t;
   };
 
   return {
@@ -123,7 +175,7 @@ export function createJaVoice() {
     play(category: JaCategory | string, { interrupt = false, index }: JaPlayOptions = {}): boolean {
       const items = manifest[category];
       if (!items?.length || volume <= 0) return false;
-      if (speaking && !interrupt) return false;
+      if ((speaking || reserved) && !interrupt) return false;
       let i = index ?? Math.floor(Math.random() * items.length);
       const prev = lastIndex.get(category);
       if (index === undefined && items.length > 1 && i === prev) i = (i + 1 + Math.floor(Math.random() * (items.length - 1))) % items.length;
@@ -132,27 +184,33 @@ export function createJaVoice() {
       const url = urlOf(line.id);
       if (!url) return false;
 
-      stop();
-      const t = ++token;
-      const a = new Audio(url);
-      a.volume = volume;
-      audio = a;
-      current = line;
-      times = revealTimes(line);
-      shown = 0;
-      a.onended = () => finish(t);
-      a.onerror = () => finish(t);
-      a.play().then(
-        () => {
-          if (t !== token) return;
-          setSpeaking(true);
-          lineCbs.forEach((cb) => cb(line, 0));
-          raf = requestAnimationFrame(() => tick(t));
-        },
-        // El navegador puede bloquear el audio hasta el primer clic: entonces no hay voz ni subtítulo.
-        () => finish(t),
-      );
+      begin(line, url, null);
       return true;
+    },
+    /**
+     * Dice una frase sintetizada al momento (voz en vivo): `url` es un audio temporal que se libera al terminar y
+     * `mouth`, las sílabas con su vocal. Corta lo que esté sonando. Resuelve cuando termina (o la cortan).
+     */
+    playLive(line: JaLine, url: string, mouth: MouthCue[]): Promise<void> {
+      if (volume <= 0) {
+        URL.revokeObjectURL(url);
+        return Promise.resolve();
+      }
+      return new Promise((resolve) => {
+        const mine = begin(line, url, mouth);
+        blobUrl = url;
+        const timer = setInterval(() => {
+          // Termina cuando esta frase ya no es la que suena (acabó, falló, la cortó otra o el audio estaba bloqueado).
+          if (token !== mine || !audio) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 60);
+      });
+    },
+    /** La voz en vivo avisa de que tiene frases pendientes (las grabadas no urgentes esperan). */
+    setReserved(v: boolean) {
+      reserved = v;
     },
     cancel: stop,
     setVolume(v: number) {
@@ -164,7 +222,7 @@ export function createJaVoice() {
       return () => speakingCbs.delete(cb);
     },
     /** Una sílaba nueva: para mover la boca. */
-    onPulse(cb: () => void) {
+    onPulse(cb: (v?: MouthCue["v"]) => void) {
       pulseCbs.add(cb);
       return () => pulseCbs.delete(cb);
     },

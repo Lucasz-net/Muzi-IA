@@ -128,7 +128,7 @@ El clasificador (`classifyToolResult`) mira el comando y la salida de las herram
 
 ### Voz
 
-La voz de Mizu son **frases cortas en japonés pregrabadas** (VOICEVOX:四国めたん, estilo «あまあま»; 134 audios en `assets/voice/ja/`, ~11 MB). La app no sintetiza nada en ejecución ni necesita VOICEVOX. Cada frase lleva su traducción: lista completa en [`docs/FRASES_MIZU.md`](docs/FRASES_MIZU.md).
+La voz de Mizu son **frases cortas en japonés pregrabadas** (VOICEVOX:四国めたん, estilo «あまあま»; 134 audios en `assets/voice/ja/`, ~11 MB). Estas frases no necesitan VOICEVOX; lo que dice con sus propias palabras sí (ver «Voz en vivo», más abajo). Cada frase lleva su traducción: lista completa en [`docs/FRASES_MIZU.md`](docs/FRASES_MIZU.md).
 
 Habla (una frase al azar de su categoría, sin repetir la anterior) al arrancar, al decir «Mizu», al recibir una orden, mientras piensa y trabaja (según la herramienta), al empezar a responder, al pedir un permiso (según la acción), al terminar (normal, con problemas o tras una tarea larga), ante errores, al reaccionar a tests/compilación/git, al detenerla, si le hablas ocupada y, de vez en cuando, en reposo. Lógica en `voice/announcer.ts`; reproducción en `voice/jaVoice.ts`.
 
@@ -137,6 +137,16 @@ Habla (una frase al azar de su categoría, sin repetir la anterior) al arrancar,
 **Ajustes** (menú): *Charla en reposo* (callada / poca / normal / mucha) y *Traducción del subtítulo*.
 
 **Cambiar o añadir frases:** edita `tools/voicevox/lines.mjs`, abre el motor de VOICEVOX (zip «voicevox_engine-windows-cpu» de github.com/VOICEVOX/voicevox_engine/releases, escucha en 127.0.0.1:50021) y ejecuta `node tools/voicevox/generate.mjs` y `node tools/voicevox/frases.mjs`. Hay que acreditar «VOICEVOX:四国めたん» si compartes la app.
+
+#### Voz en vivo (VOICEVOX en tiempo real)
+
+Además de las frases grabadas, Mizu **habla con sus propias palabras**: comenta por dónde va a empezar, cómo le fue y qué opina, teniendo en cuenta en qué estáis trabajando. Ajuste «Voz en vivo» (activado por defecto).
+
+- **De dónde sale el texto.** La personalidad (`src-tauri/persona/mizu.txt`) le pide que cada mensaje empiece con una etiqueta `<voz><ja>…</ja><es>…</es></voz>`: lo que dice en japonés y su traducción. No es leer la respuesta: es lo que diría una compañera en ese momento. No cuesta nada aparte: va en el mismo turno de Claude.
+- **`voice/voiceTags.ts`** saca las etiquetas del texto (el globo y el historial nunca las muestran, tampoco a medio escribir) y avisa de cada frase en cuanto se cierra.
+- **`voice/liveVoice.ts`** la sintetiza con el motor VOICEVOX local, con la misma voz que los audios grabados, y la reproduce por `jaVoice.ts`: mismo subtítulo y traducción, y la boca se mueve con la vocal real de cada sílaba (las duraciones las da el motor). Unos 0,8 s hasta el primer sonido.
+- **El motor.** `src-tauri/src/voicevox.rs` lo busca en `%LOCALAPPDATA%\Mizu-IA\voicevox-engine\run.exe` (también en la instalación normal de VOICEVOX o donde diga la variable `MIZU_VOICEVOX`), lo arranca sin ventana al abrir la app y lo cierra al salir. Las peticiones pasan por Rust para no depender del CORS del motor. Ocupa ~2,2 GB en disco.
+- **Sin motor** (o con la voz en vivo desactivada, o con «Forma de hablar» en «Detallada») todo sigue como antes, con las frases grabadas.
 
 El motor español anterior (Piper con Daniela, voz de Windows de respaldo) sigue en el código y solo se usa para **leer respuestas** si se activa en Ajustes (por defecto apagado).
 

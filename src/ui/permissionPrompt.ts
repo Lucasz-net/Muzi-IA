@@ -2,6 +2,7 @@ import { agent } from "../core/bridge";
 import type { AgentEvent } from "../core/events";
 import { suggestRule, type RuleStore } from "../core/permissionRules";
 import { el } from "./dom";
+import { createPlanCard, createQuestionCard, parseQuestions } from "./questionCard";
 
 type Input = Record<string, unknown>;
 
@@ -81,22 +82,40 @@ function describe(tool: string, raw: unknown, description?: string | null) {
 /** Herramientas del servidor de memoria de Mizu (`mcp_memory.rs`): se aprueban solas. */
 const MEMORY_TOOLS = new Set(["mcp__mizu-memory__remember", "mcp__mizu-memory__forget"]);
 
-export function createPermissionPrompt(parent: HTMLElement, rules: RuleStore) {
+/** Herramientas que son una conversación con la persona, no una acción: siempre se le consultan. */
+export const ASK_TOOL = "AskUserQuestion";
+export const PLAN_TOOL = "ExitPlanMode";
+const CONVERSATIONAL = new Set([ASK_TOOL, PLAN_TOOL]);
+
+/** Cómo respondió la persona a una pregunta o un plan (para que Mizu reaccione). */
+export type Decision = "answered" | "plan_ok" | "plan_revise";
+
+export function createPermissionPrompt(
+  parent: HTMLElement,
+  rules: RuleStore,
+  auto: () => boolean = () => false,
+  onDecision: (d: Decision) => void = () => {},
+) {
   const root = el("div", { class: "permissions" });
   parent.append(root);
 
   const cards = new Map<string, HTMLElement>();
 
-  const resolve = (id: string, allow: boolean) => {
-    agent.respondPermission(id, allow).catch(console.error);
+  const resolve = (id: string, allow: boolean, message?: string, updatedInput?: unknown) => {
+    agent.respondPermission(id, allow, message, updatedInput).catch(console.error);
     cards.get(id)?.remove();
     cards.delete(id);
   };
 
   return {
-    /** Si una regla recordada cubre la petición, la aprueba sin preguntar y devuelve true. */
+    /** Si el modo es automático o una regla recordada cubre la petición, la aprueba sin preguntar y devuelve true. */
     tryAutoAllow(ev: AgentEvent): boolean {
       if (ev.type !== "waiting_permission") return false;
+      // Modo automático: todo se aprueba salvo las preguntas y los planes, que sí se le consultan a la persona.
+      if (auto() && !CONVERSATIONAL.has(ev.tool_name)) {
+        agent.respondPermission(ev.request_id, true).catch(console.error);
+        return true;
+      }
       // Guardar u olvidar un recuerdo es inocuo (notas cortas, sin datos sensibles) y se puede revisar en Ajustes: no se pregunta.
       if (MEMORY_TOOLS.has(ev.tool_name)) {
         agent.respondPermission(ev.request_id, true).catch(console.error);
@@ -108,7 +127,36 @@ export function createPermissionPrompt(parent: HTMLElement, rules: RuleStore) {
       return true;
     },
     handle(ev: AgentEvent) {
-      if (ev.type === "waiting_permission") {
+      if (ev.type === "waiting_permission" && ev.tool_name === ASK_TOOL) {
+        const questions = parseQuestions(ev.input);
+        if (!questions.length) return resolve(ev.request_id, true); // formato desconocido: que siga con su criterio
+        const original = ev.input as Record<string, unknown>;
+        const card = createQuestionCard(
+          questions,
+          (answers) => {
+            resolve(ev.request_id, true, undefined, { ...original, answers });
+            onDecision("answered");
+          },
+          () => resolve(ev.request_id, false, "La persona prefiere que decidas tú: elige la opción que te parezca mejor, di cuál elegiste y sigue."),
+        );
+        cards.set(ev.request_id, card);
+        root.append(card);
+      } else if (ev.type === "waiting_permission" && ev.tool_name === PLAN_TOOL) {
+        const plan = str((ev.input as Input | null)?.plan) || "(sin texto)";
+        const card = createPlanCard(
+          plan,
+          () => {
+            resolve(ev.request_id, true);
+            onDecision("plan_ok");
+          },
+          () => {
+            resolve(ev.request_id, false, "La persona quiere ajustar el plan antes de empezar. Pregúntale qué cambiar.");
+            onDecision("plan_revise");
+          },
+        );
+        cards.set(ev.request_id, card);
+        root.append(card);
+      } else if (ev.type === "waiting_permission") {
         const { title, detail, note } = describe(ev.tool_name, ev.input, ev.description);
         const accept = el("button", { class: "btn accept", text: "Aceptar", interactive: true });
         const reject = el("button", { class: "btn reject", text: "Rechazar", interactive: true });

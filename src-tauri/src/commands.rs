@@ -199,10 +199,11 @@ pub fn agent_respond_permission(
     request_id: String,
     allow: bool,
     message: Option<String>,
+    updated_input: Option<serde_json::Value>,
 ) -> Result<(), String> {
     let mut slot = state.session.lock().unwrap();
     let session = slot.as_mut().ok_or("No hay una sesión activa")?;
-    session.respond_permission(&request_id, allow, message.as_deref())
+    session.respond_permission(&request_id, allow, message.as_deref(), updated_input)
 }
 
 /// Interrumpe el turno actual. La siguiente petición retoma la misma conversación.

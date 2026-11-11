@@ -15,10 +15,41 @@ interface Group<K extends keyof Settings> {
   options: Option<K>[];
 }
 
+const AUTO_APPROVE: Group<"autoApprove"> = {
+  key: "autoApprove",
+  title: "Permisos",
+  hint: "«Automático»: Mizu lee, escribe, edita y ejecuta lo que haga falta sin pedirte permiso, y solo te consulta decisiones (cómo abordar algo) y planes. «Preguntar»: una tarjeta por cada acción.",
+  options: [
+    { value: "on", label: "Automático" },
+    { value: "off", label: "Preguntar" },
+  ],
+};
+
+const LIVE_VOICE: Group<"liveVoice"> = {
+  key: "liveVoice",
+  title: "Voz en vivo",
+  hint: "Mizu te habla con su propia voz, en japonés y con subtítulos: comenta lo que va a hacer, cómo le fue y lo que opina, en lugar de solo frases grabadas. Usa el motor VOICEVOX de tu equipo (se abre y se cierra solo). Con «Forma de hablar» en «Detallada» no habla en vivo.",
+  options: [
+    { value: "on", label: "Activada" },
+    { value: "off", label: "Solo frases grabadas" },
+  ],
+};
+
+const GLASS: Group<"glass"> = {
+  key: "glass",
+  title: "Cristal de la interfaz",
+  hint: "Cuánto se transparentan los globos y paneles. «Denso» se lee mejor sobre fondos con mucho detalle.",
+  options: [
+    { value: "claro", label: "Claro" },
+    { value: "medio", label: "Medio" },
+    { value: "denso", label: "Denso" },
+  ],
+};
+
 const READ: Group<"read"> = {
   key: "read",
-  title: "Lectura de respuestas",
-  hint: "Qué dice Mizu en voz alta de lo que te responde. «Resumen» cuenta lo esencial al terminar; «Completa» la va leyendo según llega. El código y las tablas nunca se leen.",
+  title: "Lectura en español",
+  hint: "Lee en voz alta, en español, el texto de las respuestas. «Resumen» cuenta lo esencial al terminar; «Completa» lo va leyendo según llega. El código y las tablas nunca se leen. Mientras la voz en vivo esté hablando no se usa, para que no se pisen.",
   options: [
     { value: "off", label: "Solo avisos" },
     { value: "resumen", label: "Resumen" },
@@ -86,7 +117,7 @@ const PERSONA = {
 
 const DESKTOP = {
   title: "Control del PC",
-  hint: "Permite que Mizu vea la pantalla (solo cuando lo necesita para una tarea que le pides) y maneje el ratón y el teclado. Cada acción te pide permiso antes de hacerse.",
+  hint: "Permite que Mizu vea la pantalla (solo cuando lo necesita para una tarea que le pides) y maneje el ratón y el teclado. Con los permisos en «Automático» actúa sin preguntar; en «Preguntar», cada acción pide tu permiso.",
   options: [
     { value: "on", label: "Activado" },
     { value: "off", label: "Desactivado" },
@@ -95,18 +126,22 @@ const DESKTOP = {
 };
 
 /** Panel de ajustes: cada ajuste es un grupo de botones; el elegido queda resaltado y se guarda al momento. */
-export function createSettingsPanel(parent: HTMLElement, settings: SettingsStore, backend?: BackendControls) {
+export function createSettingsPanel(parent: HTMLElement, settings: SettingsStore, backend?: BackendControls, liveStatus?: { get: () => string; onChange: (cb: () => void) => void }) {
   const list = el("div", { class: "history-list settings-list" });
   const header = el("div", { class: "history-header" }, el("span", { text: "Ajustes" }));
   const root = el("div", { class: "history settings-panel hidden", interactive: true }, header, list);
   parent.append(root);
 
   const buttons: { key: keyof Settings; value: string; node: HTMLElement }[] = [];
-  const section = (title: string, row: HTMLElement, hint: string) =>
-    list.append(el("div", { class: "setting" }, el("div", { class: "setting-title", text: title }), row, el("div", { class: "setting-hint", text: hint })));
+  const section = (title: string, row: HTMLElement, hint: string, extra?: HTMLElement) => {
+    const node = el("div", { class: "setting" }, el("div", { class: "setting-title", text: title }), row);
+    if (extra) node.append(extra);
+    node.append(el("div", { class: "setting-hint", text: hint }));
+    list.append(node);
+  };
 
   /** Ajustes locales (`localStorage`). */
-  const group = <K extends keyof Settings>(g: Group<K>) => {
+  const group = <K extends keyof Settings>(g: Group<K>, extra?: HTMLElement) => {
     const row = el("div", { class: "seg" });
     for (const opt of g.options) {
       const node = el("button", { class: "seg-btn", text: opt.label, interactive: true });
@@ -114,7 +149,7 @@ export function createSettingsPanel(parent: HTMLElement, settings: SettingsStore
       buttons.push({ key: g.key, value: opt.value as string, node });
       row.append(node);
     }
-    section(g.title, row, g.hint);
+    section(g.title, row, g.hint, extra);
   };
 
   /** Ajustes del backend: se pide el valor al abrir y cada cambio se confirma antes de marcarlo. */
@@ -172,6 +207,24 @@ export function createSettingsPanel(parent: HTMLElement, settings: SettingsStore
     section("Volumen de Mizu", el("div", { class: "slider-row" }, input, volumeValue), "Volumen de su voz, además del de Windows. En el mezclador de volumen de Windows también aparece como «Mizu-IA».");
   };
 
+  // Estado del motor de voz en vivo, bajo su interruptor.
+  const liveState = el("div", { class: "setting-state" });
+  const LIVE_TEXT: Record<string, [string, string]> = {
+    ready: ["ok", "Motor de voz listo"],
+    starting: ["wait", "Arrancando el motor de voz…"],
+    missing: ["bad", "No encuentro el motor VOICEVOX: de momento usa las frases grabadas"],
+    off: ["", "Desactivada"],
+  };
+  const renderLive = () => {
+    const [kind, text] = LIVE_TEXT[liveStatus?.get() ?? "off"] ?? LIVE_TEXT.off;
+    liveState.textContent = text;
+    liveState.dataset.kind = kind;
+  };
+  liveStatus?.onChange(renderLive);
+  renderLive();
+
+  group(LIVE_VOICE, liveState);
+
   /** Lo que Mizu recuerda de ti: se vuelve a pedir cada vez que se abre el panel y se borra de uno en uno. */
   const memoryList = el("div", { class: "memory-list" });
   const renderMemory = (notes: MemoryNote[]) => {
@@ -197,11 +250,13 @@ export function createSettingsPanel(parent: HTMLElement, settings: SettingsStore
     backendGroup("persona", PERSONA, backend.persona);
     backendGroup("desktop", DESKTOP, backend.desktop);
   }
+  group(AUTO_APPROVE);
   group(CHATTER);
   group(TRANSLATION);
   group(READ);
   group(GESTURES);
   volumeSlider();
+  group(GLASS);
 
   const render = () => {
     const now = settings.get();
