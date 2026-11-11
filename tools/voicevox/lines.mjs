@@ -123,6 +123,45 @@ export const LINES = {
     ["ウィンドウを切り替えてもいい？", "¿Puedo cambiar de ventana?"],
     ["別のウィンドウに移るね。いいかな？", "Voy a pasar a otra ventana. ¿Puedo?"],
   ],
+  // Te hace una pregunta con botones (cómo resolver algo, qué prefieres)
+  ask_question: [
+    ["どうしたらいいかな？ 選んでほしいの。", "¿Cómo lo hago? Quiero que elijas."],
+    ["ねえ、どっちがいい？", "Oye, ¿cuál prefieres?"],
+    ["ここは君に決めてほしいな。", "Aquí quiero que decidas tú."],
+    ["迷っちゃった。助けてくれる？", "Me quedé dudando. ¿Me ayudas?"],
+    ["やり方がいくつかあるよ。どれにする？", "Hay varias formas de hacerlo. ¿Cuál eliges?"],
+    ["ちょっと相談したいことがあるの。", "Quiero consultarte una cosita."],
+    ["おすすめはあるけど、決めるのは君だよ。", "Tengo una recomendación, pero decides tú."],
+    ["君の考えを聞かせて。", "Dime lo que piensas."],
+  ],
+  // Te enseña un plan para aprobar
+  ask_plan: [
+    ["作戦を考えたよ。見てくれる？", "Pensé un plan. ¿Lo miras?"],
+    ["こんな計画でどうかな？", "¿Qué te parece este plan?"],
+    ["始める前に、確認してね。", "Antes de empezar, confírmalo."],
+    ["計画ができたよ。これでいい？", "Tengo el plan. ¿Está bien así?"],
+  ],
+  // Acaba de elegir una opción
+  answered: [
+    ["なるほど、それでいこう！", "Ya veo, ¡vamos con eso!"],
+    ["いい選択だね！", "¡Buena elección!"],
+    ["わかった、それにするね。", "Vale, haré eso."],
+    ["了解！ 任せて。", "¡Entendido! Déjamelo a mí."],
+    ["うんうん、いいと思う！", "Sí, sí, ¡me parece bien!"],
+    ["ありがとう、決まりだね。", "Gracias, entonces está decidido."],
+  ],
+  // Aprueba el plan
+  plan_ok: [
+    ["よーし、作戦開始！", "¡Bien, comienza la operación!"],
+    ["ありがとう！ さっそく始めるね。", "¡Gracias! Empiezo ya mismo."],
+    ["計画どおりにがんばるよ！", "¡Me esforzaré para seguir el plan!"],
+  ],
+  // Quiere cambiar el plan
+  plan_revise: [
+    ["そっか、もう一回考えてみるね。", "Ya veo, lo pensaré otra vez."],
+    ["うーん、じゃあ作り直すね。", "Mmm, entonces lo rehago."],
+    ["わかった。どこを直そうか？", "Vale. ¿Qué cambiamos?"],
+  ],
   // Fin de la tarea
   done_ok: [
     ["終わったよ！", "¡Terminé!"],
@@ -213,6 +252,36 @@ export const LINES = {
     ["お菓子食べたいなぁ。", "Me apetece algo dulce…"],
     ["のんびりするのも大切だね。", "Relajarse también es importante."],
     ["私はここにいるからね。", "Yo estoy aquí contigo."],
+    // Más charla, con guiños al anime
+    ["今日の私は、主人公になれるかな？", "¿Hoy podré ser la protagonista?"],
+    ["最後まで、あきらめないよ！ それが私の忍道だってばよ。", "¡No me rendiré hasta el final! Ese es mi camino ninja."],
+    ["海賊王に、私はなる！ …なんてね。", "¡Yo seré la reina de los piratas! …Es broma."],
+    ["魔法少女に変身したいな。", "Me gustaría transformarme en una chica mágica."],
+    ["かめはめ波、出せたらいいのになあ。", "Ojalá pudiera lanzar un kame hame ha."],
+    ["ポケモン、ゲットだぜ！ …してみたいな。", "¡Atrápalos ya! … Me gustaría probarlo."],
+    ["友情、努力、勝利！ …これが王道だよね。", "Amistad, esfuerzo, victoria. Esa es la fórmula clásica."],
+    ["知らない天井だ…なんて言ってみたりして。", "«Es un techo que no conozco»… a veces lo digo."],
+    ["月に代わって、おしおきよ！ …えへへ。", "¡En nombre de la luna te castigaré! …Jeje."],
+    ["三つ編みの子は、だいたい文学少女だよね。", "Las chicas con trenzas casi siempre aman los libros, ¿verdad?"],
+    ["今日はなんだか、日常アニメの気分だなあ。", "Hoy tengo ganas de un anime de la vida diaria."],
+    ["お茶でも飲みながら、のんびり行こうよ。", "Vamos con calma, tomando un té."],
+    ["桜が見たいなあ。", "Quiero ver los cerezos en flor."],
+    ["夜空を見上げたくなる日もあるよね。", "Hay días en que apetece mirar el cielo de noche."],
+    ["ラーメン食べたいなあ。", "Me apetece un ramen."],
+    ["たい焼きって、あたまから食べる？ しっぽから？", "El taiyaki, ¿lo empiezas por la cabeza o por la cola?"],
+    ["にゃーん。…ふふ、ねこのまねだよ。", "Miau. …Jeje, imito a un gatito."],
+    ["お疲れさま。ちょっと一息つこうよ。", "Buen trabajo. Tomemos un respiro."],
+    ["ねえ、今日はどんな一日だった？", "Oye, ¿qué tal fue tu día?"],
+    ["君となら、どこまでも行けそうだよ。", "Contigo creo que llegaría a cualquier parte."],
+    ["ひとりじゃないからね。いつでも呼んで。", "No estás solo. Llámame cuando quieras."],
+    ["ちょっと背伸びしよっと。ん〜っ！", "Voy a estirarme un poco. ¡Mmmm!"],
+    ["勇者さま、次はどこへ行きますか？", "Señor héroe, ¿adónde vamos ahora?"],
+    ["ふふっ、なんだか楽しくなってきた！", "Jeje, ¡me estoy animando!"],
+    ["ほら、笑って笑って。", "Anda, sonríe, sonríe."],
+    ["努力は裏切らないって、よく言うよね。", "Dicen que el esfuerzo nunca traiciona."],
+    ["夢は大きくいこうよ！", "¡Soñemos a lo grande!"],
+    ["今日のラッキーアイテムは、なにかな？", "¿Cuál será el objeto de la suerte de hoy?"],
+    ["さあ、次の冒険はなにかな？", "Bueno, ¿cuál será la próxima aventura?"],
   ],
   // Al soltar el control de volumen
   preview: [["こんにちは、これが私の声だよ。", "Hola, esta es mi voz."]],

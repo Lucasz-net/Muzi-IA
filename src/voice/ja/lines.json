@@ -611,6 +611,208 @@
    "tailMs": 150
   }
  ],
+ "ask_question": [
+  {
+   "id": "ask_question_01",
+   "ja": "どうしたらいいかな？ 選んでほしいの。",
+   "es": "¿Cómo lo hago? Quiero que elijas.",
+   "ms": 2965,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ask_question_02",
+   "ja": "ねえ、どっちがいい？",
+   "es": "Oye, ¿cuál prefieres?",
+   "ms": 2091,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ask_question_03",
+   "ja": "ここは君に決めてほしいな。",
+   "es": "Aquí quiero que decidas tú.",
+   "ms": 2016,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ask_question_04",
+   "ja": "迷っちゃった。助けてくれる？",
+   "es": "Me quedé dudando. ¿Me ayudas?",
+   "ms": 2464,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ask_question_05",
+   "ja": "やり方がいくつかあるよ。どれにする？",
+   "es": "Hay varias formas de hacerlo. ¿Cuál eliges?",
+   "ms": 2987,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ask_question_06",
+   "ja": "ちょっと相談したいことがあるの。",
+   "es": "Quiero consultarte una cosita.",
+   "ms": 2187,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ask_question_07",
+   "ja": "おすすめはあるけど、決めるのは君だよ。",
+   "es": "Tengo una recomendación, pero decides tú.",
+   "ms": 3093,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ask_question_08",
+   "ja": "君の考えを聞かせて。",
+   "es": "Dime lo que piensas.",
+   "ms": 1803,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "ask_plan": [
+  {
+   "id": "ask_plan_01",
+   "ja": "作戦を考えたよ。見てくれる？",
+   "es": "Pensé un plan. ¿Lo miras?",
+   "ms": 2901,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ask_plan_02",
+   "ja": "こんな計画でどうかな？",
+   "es": "¿Qué te parece este plan?",
+   "ms": 1867,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ask_plan_03",
+   "ja": "始める前に、確認してね。",
+   "es": "Antes de empezar, confírmalo.",
+   "ms": 2603,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "ask_plan_04",
+   "ja": "計画ができたよ。これでいい？",
+   "es": "Tengo el plan. ¿Está bien así?",
+   "ms": 2613,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "answered": [
+  {
+   "id": "answered_01",
+   "ja": "なるほど、それでいこう！",
+   "es": "Ya veo, ¡vamos con eso!",
+   "ms": 2005,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "answered_02",
+   "ja": "いい選択だね！",
+   "es": "¡Buena elección!",
+   "ms": 1227,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "answered_03",
+   "ja": "わかった、それにするね。",
+   "es": "Vale, haré eso.",
+   "ms": 2037,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "answered_04",
+   "ja": "了解！ 任せて。",
+   "es": "¡Entendido! Déjamelo a mí.",
+   "ms": 1717,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "answered_05",
+   "ja": "うんうん、いいと思う！",
+   "es": "Sí, sí, ¡me parece bien!",
+   "ms": 2059,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "answered_06",
+   "ja": "ありがとう、決まりだね。",
+   "es": "Gracias, entonces está decidido.",
+   "ms": 1973,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "plan_ok": [
+  {
+   "id": "plan_ok_01",
+   "ja": "よーし、作戦開始！",
+   "es": "¡Bien, comienza la operación!",
+   "ms": 2165,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "plan_ok_02",
+   "ja": "ありがとう！ さっそく始めるね。",
+   "es": "¡Gracias! Empiezo ya mismo.",
+   "ms": 2507,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "plan_ok_03",
+   "ja": "計画どおりにがんばるよ！",
+   "es": "¡Me esforzaré para seguir el plan!",
+   "ms": 1877,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
+ "plan_revise": [
+  {
+   "id": "plan_revise_01",
+   "ja": "そっか、もう一回考えてみるね。",
+   "es": "Ya veo, lo pensaré otra vez.",
+   "ms": 2827,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "plan_revise_02",
+   "ja": "うーん、じゃあ作り直すね。",
+   "es": "Mmm, entonces lo rehago.",
+   "ms": 2709,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "plan_revise_03",
+   "ja": "わかった。どこを直そうか？",
+   "es": "Vale. ¿Qué cambiamos?",
+   "ms": 2368,
+   "leadMs": 50,
+   "tailMs": 150
+  }
+ ],
  "done_ok": [
   {
    "id": "done_ok_01",
@@ -1121,6 +1323,238 @@
    "ja": "私はここにいるからね。",
    "es": "Yo estoy aquí contigo.",
    "ms": 1792,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_21",
+   "ja": "今日の私は、主人公になれるかな？",
+   "es": "¿Hoy podré ser la protagonista?",
+   "ms": 3093,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_22",
+   "ja": "最後まで、あきらめないよ！ それが私の忍道だってばよ。",
+   "es": "¡No me rendiré hasta el final! Ese es mi camino ninja.",
+   "ms": 4672,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_23",
+   "ja": "海賊王に、私はなる！ …なんてね。",
+   "es": "¡Yo seré la reina de los piratas! …Es broma.",
+   "ms": 3424,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_24",
+   "ja": "魔法少女に変身したいな。",
+   "es": "Me gustaría transformarme en una chica mágica.",
+   "ms": 2112,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_25",
+   "ja": "かめはめ波、出せたらいいのになあ。",
+   "es": "Ojalá pudiera lanzar un kame hame ha.",
+   "ms": 2592,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_26",
+   "ja": "ポケモン、ゲットだぜ！ …してみたいな。",
+   "es": "¡Atrápalos ya! … Me gustaría probarlo.",
+   "ms": 3253,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_27",
+   "ja": "友情、努力、勝利！ …これが王道だよね。",
+   "es": "Amistad, esfuerzo, victoria. Esa es la fórmula clásica.",
+   "ms": 3936,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_28",
+   "ja": "知らない天井だ…なんて言ってみたりして。",
+   "es": "«Es un techo que no conozco»… a veces lo digo.",
+   "ms": 3051,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_29",
+   "ja": "月に代わって、おしおきよ！ …えへへ。",
+   "es": "¡En nombre de la luna te castigaré! …Jeje.",
+   "ms": 3232,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_30",
+   "ja": "三つ編みの子は、だいたい文学少女だよね。",
+   "es": "Las chicas con trenzas casi siempre aman los libros, ¿verdad?",
+   "ms": 3264,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_31",
+   "ja": "今日はなんだか、日常アニメの気分だなあ。",
+   "es": "Hoy tengo ganas de un anime de la vida diaria.",
+   "ms": 3392,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_32",
+   "ja": "お茶でも飲みながら、のんびり行こうよ。",
+   "es": "Vamos con calma, tomando un té.",
+   "ms": 2763,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_33",
+   "ja": "桜が見たいなあ。",
+   "es": "Quiero ver los cerezos en flor.",
+   "ms": 1419,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_34",
+   "ja": "夜空を見上げたくなる日もあるよね。",
+   "es": "Hay días en que apetece mirar el cielo de noche.",
+   "ms": 2464,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_35",
+   "ja": "ラーメン食べたいなあ。",
+   "es": "Me apetece un ramen.",
+   "ms": 1472,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_36",
+   "ja": "たい焼きって、あたまから食べる？ しっぽから？",
+   "es": "El taiyaki, ¿lo empiezas por la cabeza o por la cola?",
+   "ms": 3819,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_37",
+   "ja": "にゃーん。…ふふ、ねこのまねだよ。",
+   "es": "Miau. …Jeje, imito a un gatito.",
+   "ms": 3136,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_38",
+   "ja": "お疲れさま。ちょっと一息つこうよ。",
+   "es": "Buen trabajo. Tomemos un respiro.",
+   "ms": 2752,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_39",
+   "ja": "ねえ、今日はどんな一日だった？",
+   "es": "Oye, ¿qué tal fue tu día?",
+   "ms": 2901,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_40",
+   "ja": "君となら、どこまでも行けそうだよ。",
+   "es": "Contigo creo que llegaría a cualquier parte.",
+   "ms": 2667,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_41",
+   "ja": "ひとりじゃないからね。いつでも呼んで。",
+   "es": "No estás solo. Llámame cuando quieras.",
+   "ms": 2741,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_42",
+   "ja": "ちょっと背伸びしよっと。ん〜っ！",
+   "es": "Voy a estirarme un poco. ¡Mmmm!",
+   "ms": 4203,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_43",
+   "ja": "勇者さま、次はどこへ行きますか？",
+   "es": "Señor héroe, ¿adónde vamos ahora?",
+   "ms": 2955,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_44",
+   "ja": "ふふっ、なんだか楽しくなってきた！",
+   "es": "Jeje, ¡me estoy animando!",
+   "ms": 2667,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_45",
+   "ja": "ほら、笑って笑って。",
+   "es": "Anda, sonríe, sonríe.",
+   "ms": 1909,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_46",
+   "ja": "努力は裏切らないって、よく言うよね。",
+   "es": "Dicen que el esfuerzo nunca traiciona.",
+   "ms": 2933,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_47",
+   "ja": "夢は大きくいこうよ！",
+   "es": "¡Soñemos a lo grande!",
+   "ms": 1707,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_48",
+   "ja": "今日のラッキーアイテムは、なにかな？",
+   "es": "¿Cuál será el objeto de la suerte de hoy?",
+   "ms": 2805,
+   "leadMs": 50,
+   "tailMs": 150
+  },
+  {
+   "id": "idle_49",
+   "ja": "さあ、次の冒険はなにかな？",
+   "es": "Bueno, ¿cuál será la próxima aventura?",
+   "ms": 2944,
    "leadMs": 50,
    "tailMs": 150
   }
